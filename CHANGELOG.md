@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.0.1] - 2026-03-23
+
 ### Changed
 - `MC_PUBLIC_IP` is now optional (informational only, not used in operations)
+
+### Fixed
+- Make volume mount prefix configurable via `NFS_BASE_PATH` instead of hardcoding paths in job spec validation
 
 ## [v1.0.0] - 2026-03-23
 
