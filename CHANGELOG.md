@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- `MC_PUBLIC_IP` is now optional (informational only, not used in operations)
+
 ## [v1.0.0] - 2026-03-23
 
 ### Fixed
