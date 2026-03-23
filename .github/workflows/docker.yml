@@ -11,6 +11,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      actions: write
 
     steps:
       - uses: actions/checkout@v6
@@ -42,3 +43,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ github.ref_name }}
+
+      - name: Notify homelab-chatbot to rebuild
+        if: success()
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DISPATCH_TOKEN }}
+          repository: lobo235/homelab-chatbot
+          event-type: mcp-server-updated
