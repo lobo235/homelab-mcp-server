@@ -126,7 +126,7 @@ internal/validation/              — Job spec pre-flight validation
 internal/prompts/                 — MCP prompt resources (homelab_context, etc.)
 internal/resilience/              — Retry policy, circuit breaker, health checks
 internal/speccache/               — Nomad job spec cache (auto-seeded on startup)
-internal/itzhcache/               — itzg/docker-minecraft-server docs cache
+internal/itzgcache/               — itzg/docker-minecraft-server docs cache
 ```
 
 ## MCP Tools

@@ -17,7 +17,7 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/vault"
 	"github.com/lobo235/homelab-mcp-server/internal/config"
-	"github.com/lobo235/homelab-mcp-server/internal/itzhcache"
+	"github.com/lobo235/homelab-mcp-server/internal/itzgcache"
 	"github.com/lobo235/homelab-mcp-server/internal/prompts"
 	"github.com/lobo235/homelab-mcp-server/internal/speccache"
 	"github.com/lobo235/homelab-mcp-server/internal/tools/atomic"
@@ -90,7 +90,7 @@ func main() {
 
 	// Start itzg docs cache with background refresh.
 	itzgCacheDir := filepath.Join(cfg.DataDir, "itzg-docs")
-	itzgCache, err := itzhcache.New(itzgCacheDir, log)
+	itzgCache, err := itzgcache.New(itzgCacheDir, log)
 	if err != nil {
 		log.Error("itzg-cache init failed", "error", err)
 		os.Exit(1)

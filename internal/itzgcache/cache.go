@@ -1,6 +1,6 @@
-// Package itzhcache provides a cached copy of the itzg/docker-minecraft-server documentation.
+// Package itzgcache provides a cached copy of the itzg/docker-minecraft-server documentation.
 // It fetches the docs on startup and refreshes them periodically in a background goroutine.
-package itzhcache
+package itzgcache
 
 import (
 	"context"

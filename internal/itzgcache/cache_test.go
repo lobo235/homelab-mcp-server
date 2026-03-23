@@ -1,4 +1,4 @@
-package itzhcache
+package itzgcache
 
 import (
 	"context"
