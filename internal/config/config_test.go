@@ -25,7 +25,6 @@ func setRequiredEnvVars(t *testing.T) {
 		"NOMAD_DEFAULT_DATACENTER": "dc1",
 		"NFS_BASE_PATH":            "/mnt/fast/minecraft",
 		"MC_PUBLIC_DOMAIN":         "mc.example.com",
-		"MC_PUBLIC_IP":             "203.0.113.1",
 		"CF_ZONE_NAME":             "example.com",
 	}
 	for k, v := range vars {
@@ -75,7 +74,6 @@ func TestLoad_MissingRequired(t *testing.T) {
 		"NOMAD_DEFAULT_DATACENTER",
 		"NFS_BASE_PATH",
 		"MC_PUBLIC_DOMAIN",
-		"MC_PUBLIC_IP",
 		"CF_ZONE_NAME",
 	}
 

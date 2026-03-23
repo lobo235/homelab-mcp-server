@@ -127,7 +127,6 @@ func Load() (*Config, error) {
 		"NOMAD_DEFAULT_DATACENTER": cfg.NomadDefaultDatacenter,
 		"NFS_BASE_PATH":            cfg.NFSBasePath,
 		"MC_PUBLIC_DOMAIN":         cfg.MCPublicDomain,
-		"MC_PUBLIC_IP":             cfg.MCPublicIP,
 		"CF_ZONE_NAME":             cfg.CFZoneName,
 	}
 	for name, val := range required {

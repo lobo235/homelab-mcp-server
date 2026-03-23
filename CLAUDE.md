@@ -102,7 +102,7 @@ All config via ENV vars. Loaded from `.env` in development (via `godotenv`; miss
 | `NOMAD_DEFAULT_NODE_POOL` | no | `default` | Default node pool for MC jobs |
 | `NFS_BASE_PATH` | yes | — | NFS base path for Minecraft server volumes |
 | `MC_PUBLIC_DOMAIN` | yes | — | Public domain for MC server CNAMEs |
-| `MC_PUBLIC_IP` | yes | — | Public IP for A-record (CNAMEs point here) |
+| `MC_PUBLIC_IP` | no | — | Public IP for informational context (not used in operations) |
 | `CF_ZONE_NAME` | yes | — | Cloudflare zone name |
 | `ARTIFACT_ALLOWLIST` | no | — | Additional artifact source domains (comma-separated) |
 | `DATA_DIR` | no | `/data` | Directory for spec cache, itzg docs, and state |
