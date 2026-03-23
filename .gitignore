@@ -1,0 +1,4 @@
+.env
+homelab-mcp-server
+coverage.out
+.claude/

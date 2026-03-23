@@ -1,0 +1,41 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck      # unhandled errors
+    - govet         # go vet checks
+    - staticcheck   # static analysis (includes gosimple in v2)
+    - unused        # unused code
+    - gocyclo       # cyclomatic complexity
+    - misspell      # typos in comments/strings
+    - revive        # idiomatic Go style
+
+  settings:
+    gocyclo:
+      min-complexity: 20
+    revive:
+      rules:
+        - name: exported
+          severity: warning
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - revive
+      - text: "Error return value of `.*Body\\.Close` is not checked"
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - goimports     # import ordering
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/lobo235/homelab-mcp-server
+
+issues:
+  max-same-issues: 0
