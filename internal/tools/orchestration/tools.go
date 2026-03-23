@@ -82,18 +82,24 @@ func (d *Deps) waitForHealth(ctx context.Context, jobID string, maxAttempts int,
 	return false
 }
 
-// executeProvision runs the 5-step Minecraft server provisioning workflow.
+// executeProvision runs the 6-step Minecraft server provisioning workflow.
+// Order: DNS first (maximize propagation time), then secret, directory, job spec, submit, health.
 func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[string]any, error) {
 	var steps []string
+	hostname := name + "." + d.MCPublicDomain
 
-	// Step 1: Init server directory.
-	d.Log.Info("provision: init directory", "server", name)
-	if err := d.Minecraft.InitServer(ctx, name); err != nil {
-		return nil, fmt.Errorf("step 1/5 init directory failed: %w", err)
+	// Step 1: Create Cloudflare DNS CNAME (first to maximize propagation time).
+	d.Log.Info("provision: create DNS", "server", name, "hostname", hostname)
+	proxied := false
+	rec := cloudflare.DNSRecord{
+		Type: "CNAME", Name: hostname, Content: d.MCPublicDomain, TTL: 1, Proxied: &proxied,
 	}
-	steps = append(steps, "directory")
+	if _, err := d.Cloudflare.CreateRecordByZoneName(ctx, d.CFZoneName, rec); err != nil {
+		return nil, fmt.Errorf("step 1/5 create DNS failed: %w", err)
+	}
+	steps = append(steps, "dns")
 
-	// Step 2: Create Vault secret.
+	// Step 2: Create Vault secret (RCON password).
 	d.Log.Info("provision: create secret", "server", name)
 	if err := d.Vault.CreateSecret(ctx, name); err != nil {
 		d.rollbackProvision(ctx, name, steps)
@@ -101,27 +107,23 @@ func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[stri
 	}
 	steps = append(steps, "secret")
 
-	// Step 3: Submit Nomad job.
+	// Step 3: Init NFS server directory.
+	d.Log.Info("provision: init directory", "server", name)
+	if err := d.Minecraft.InitServer(ctx, name); err != nil {
+		d.rollbackProvision(ctx, name, steps)
+		return nil, fmt.Errorf("step 3/5 init directory failed: %w", err)
+	}
+	steps = append(steps, "directory")
+
+	// Step 4: Submit Nomad job.
 	d.Log.Info("provision: submit job", "server", name)
 	if _, err := d.Nomad.SubmitJob(ctx, hcl); err != nil {
 		d.rollbackProvision(ctx, name, steps)
-		return nil, fmt.Errorf("step 3/5 submit job failed: %w", err)
+		return nil, fmt.Errorf("step 4/5 submit job failed: %w", err)
 	}
-	steps = append(steps, "job")
+	_ = append(steps, "job") // last step; value unused but documents completion
 
-	// Step 4: Create Cloudflare DNS.
-	hostname := name + "." + d.MCPublicDomain
-	d.Log.Info("provision: create DNS", "server", name, "hostname", hostname)
-	proxied := false
-	rec := cloudflare.DNSRecord{
-		Type: "CNAME", Name: hostname, Content: d.MCPublicDomain, TTL: 1, Proxied: &proxied,
-	}
-	if _, err := d.Cloudflare.CreateRecordByZoneName(ctx, d.CFZoneName, rec); err != nil {
-		d.rollbackProvision(ctx, name, steps)
-		return nil, fmt.Errorf("step 4/5 create DNS failed: %w", err)
-	}
-
-	// Step 5: Wait for health.
+	// Step 5: Wait for health (up to 5 min).
 	d.Log.Info("provision: waiting for health", "server", name)
 	healthy := d.waitForHealth(ctx, name, 30, 10*time.Second)
 

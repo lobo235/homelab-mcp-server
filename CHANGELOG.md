@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Client tests using httptest for nomad-gateway and vault-gateway
 - Layer 1 atomic MCP tools: 22 tools wrapping individual gateway calls
 - Layer 2 orchestration MCP tools: provision/destroy minecraft server (with rollback), provision/destroy nomad workload
-- Layer 3 high-level MCP tools: get server status, send RCON, op/deop player, backup server
+- Layer 3 high-level MCP tools: create/destroy/upgrade minecraft server, deploy generic workload, get server status, send RCON, op/deop player, backup server
 - Job spec pre-flight validation (required fields, security rules, naming, resource limits)
 - Validation tests covering all pre-flight check rules
 - MCP prompts: homelab_context, minecraft_server_sizing, server_naming_convention
@@ -28,3 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Dockerfile (multi-stage: golang:1.26-alpine -> alpine:3.21)
 - .golangci.yml with strict linter config
 - Pre-commit hook (lint + test)
+
+### Changed
+
+- Provisioning order: DNS first to maximize propagation time (DNS → secret → directory → job → health)
