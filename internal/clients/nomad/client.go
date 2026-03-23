@@ -164,9 +164,13 @@ func (c *Client) RestartAllocation(ctx context.Context, jobID, allocID string) e
 }
 
 // GetAllocationLogs returns logs for a specific allocation.
-func (c *Client) GetAllocationLogs(ctx context.Context, jobID, allocID string) (*LogOutput, error) {
+// task is required by the nomad-gateway. logType defaults to "stdout" if empty.
+func (c *Client) GetAllocationLogs(ctx context.Context, jobID, allocID, task, logType string) (*LogOutput, error) {
+	if logType == "" {
+		logType = "stdout"
+	}
 	var logs LogOutput
-	path := fmt.Sprintf("/jobs/%s/allocations/%s/logs", jobID, allocID)
+	path := fmt.Sprintf("/jobs/%s/allocations/%s/logs?task=%s&type=%s", jobID, allocID, task, logType)
 	if err := c.base.DoJSON(ctx, "GET", path, nil, &logs); err != nil {
 		return nil, fmt.Errorf("get allocation logs %q: %w", allocID, err)
 	}

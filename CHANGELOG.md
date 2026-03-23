@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- `get_job_logs` tool now passes required `task` parameter to nomad-gateway logs endpoint (was returning 400 `missing_param` error)
+- `get_job_logs` tool accepts optional `log_type` parameter (stdout/stderr)
+
 ## [v1.0.1] - 2026-03-23
 
 ### Changed
