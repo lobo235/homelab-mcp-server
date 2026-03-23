@@ -24,10 +24,14 @@ type Mod struct {
 
 // ModpackFile represents a file/version of a modpack.
 type ModpackFile struct {
-	ID          int    `json:"id"`
-	DisplayName string `json:"display_name"`
-	FileName    string `json:"file_name"`
-	GameVersion string `json:"game_version"`
+	ID           int      `json:"id"`
+	DisplayName  string   `json:"displayName"`
+	FileName     string   `json:"fileName"`
+	GameVersions []string `json:"gameVersions"`
+	IsServerPack bool     `json:"isServerPack"`
+	DownloadURL  string   `json:"downloadUrl"`
+	FileLength   int64    `json:"fileLength"`
+	ReleaseType  int      `json:"releaseType"`
 }
 
 // Client wraps the curseforge-gateway HTTP API.

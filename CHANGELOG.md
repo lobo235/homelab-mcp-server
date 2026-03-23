@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - Docker build workflow resolves version from git tags for non-tag builds
 
+## [v1.0.3] - 2026-03-23
+
+### Fixed
+- CurseForge client `ModpackFile` struct JSON tags now match gateway response format (camelCase, not snake_case) — fixes empty displayName, fileName, and gameVersions in file listings
+- `ModpackFile.GameVersions` is now `[]string` to match the gateway's array response (was `string`)
+
 ## [v1.0.2] - 2026-03-23
 
 ### Fixed
