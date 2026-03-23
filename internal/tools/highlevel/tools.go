@@ -12,6 +12,7 @@ import (
 
 	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
+	"github.com/lobo235/homelab-mcp-server/internal/validation"
 )
 
 // playerNamePattern validates Minecraft usernames.
@@ -53,6 +54,9 @@ func createMinecraftServer(d *Deps) server.ServerTool {
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			serverName, err := req.RequireString("server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := validation.ValidateServerName(serverName); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
@@ -109,6 +113,9 @@ func destroyMinecraftServerByName(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
+			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 
 			// This is a convenience wrapper — the chatbot should call destroy_minecraft_server directly.
 			// Return instructions for the orchestration call.
@@ -135,6 +142,9 @@ func upgradeMinecraftServer(d *Deps) server.ServerTool {
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			name, err := req.RequireString("name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := validation.ValidateServerName(name); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			newVersion := req.GetString("new_version", "")
@@ -178,6 +188,9 @@ func getMinecraftServerStatus(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
+			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 
 			job, err := d.Nomad.GetJob(ctx, name)
 			if err != nil {
@@ -217,6 +230,9 @@ func sendRCONCommand(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
+			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 			command, err := req.RequireString("command")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
@@ -241,6 +257,9 @@ func opPlayer(d *Deps) server.ServerTool {
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			name, err := req.RequireString("server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := validation.ValidateServerName(name); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			player, err := req.RequireString("player")
@@ -272,6 +291,9 @@ func deopPlayer(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
+			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 			player, err := req.RequireString("player")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
@@ -298,6 +320,9 @@ func backupServer(d *Deps) server.ServerTool {
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			name, err := req.RequireString("name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := validation.ValidateServerName(name); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 

@@ -121,10 +121,10 @@ func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[stri
 		d.rollbackProvision(ctx, name, steps)
 		return nil, fmt.Errorf("step 4/5 submit job failed: %w", err)
 	}
-	_ = append(steps, "job") // last step; value unused but documents completion
+	steps = append(steps, "job")
 
 	// Step 5: Wait for health (up to 5 min).
-	d.Log.Info("provision: waiting for health", "server", name)
+	d.Log.Info("provision: waiting for health", "server", name, "completed_steps", steps)
 	healthy := d.waitForHealth(ctx, name, 30, 10*time.Second)
 
 	result := map[string]any{
@@ -146,6 +146,9 @@ func provisionMinecraftServer(d *Deps) server.ServerTool {
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			name, err := req.RequireString("name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := validation.ValidateServerName(name); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			hcl, err := req.RequireString("hcl")
@@ -176,6 +179,9 @@ func destroyMinecraftServer(d *Deps) server.ServerTool {
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			name, err := req.RequireString("name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := validation.ValidateServerName(name); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			deleteDir := req.GetBool("delete_directory", false)
@@ -233,6 +239,9 @@ func provisionNomadWorkload(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
+			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 			hcl, err := req.RequireString("hcl")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
@@ -280,6 +289,9 @@ func destroyNomadWorkload(d *Deps) server.ServerTool {
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			name, err := req.RequireString("name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := validation.ValidateServerName(name); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 

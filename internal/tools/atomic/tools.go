@@ -18,6 +18,42 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/validation"
 )
 
+// requireServerName extracts and validates a server name from the request.
+func requireServerName(req mcp.CallToolRequest, param string) (string, error) {
+	name, err := req.RequireString(param)
+	if err != nil {
+		return "", err
+	}
+	if err := validation.ValidateServerName(name); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+// requireJobID extracts and validates a job ID from the request.
+func requireJobID(req mcp.CallToolRequest, param string) (string, error) {
+	id, err := req.RequireString(param)
+	if err != nil {
+		return "", err
+	}
+	if !validation.ValidateJobName(id) {
+		return "", fmt.Errorf("invalid job ID %q: must match ^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$", id)
+	}
+	return id, nil
+}
+
+// requireAllocID extracts and validates an allocation ID from the request.
+func requireAllocID(req mcp.CallToolRequest, param string) (string, error) {
+	id, err := req.RequireString(param)
+	if err != nil {
+		return "", err
+	}
+	if err := validation.ValidateAllocID(id); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
 // Deps holds the dependencies for atomic tools.
 type Deps struct {
 	Nomad      *nomad.Client
@@ -93,7 +129,7 @@ func getJobSpec(d *Deps) server.ServerTool {
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			jobID, err := req.RequireString("job_id")
+			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -113,7 +149,7 @@ func getJobStatus(d *Deps) server.ServerTool {
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			jobID, err := req.RequireString("job_id")
+			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -142,11 +178,11 @@ func getJobLogs(d *Deps) server.ServerTool {
 			mcp.WithString("alloc_id", mcp.Required(), mcp.Description("Allocation ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			jobID, err := req.RequireString("job_id")
+			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			allocID, err := req.RequireString("alloc_id")
+			allocID, err := requireAllocID(req, "alloc_id")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -192,7 +228,7 @@ func stopNomadJob(d *Deps) server.ServerTool {
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			jobID, err := req.RequireString("job_id")
+			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -212,11 +248,11 @@ func restartNomadAllocation(d *Deps) server.ServerTool {
 			mcp.WithString("alloc_id", mcp.Required(), mcp.Description("Allocation ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			jobID, err := req.RequireString("job_id")
+			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			allocID, err := req.RequireString("alloc_id")
+			allocID, err := requireAllocID(req, "alloc_id")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -235,7 +271,7 @@ func watchJobHealth(d *Deps) server.ServerTool {
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			jobID, err := req.RequireString("job_id")
+			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -359,7 +395,7 @@ func createServerSecret(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			name, err := req.RequireString("server_name")
+			name, err := requireServerName(req, "server_name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -378,7 +414,7 @@ func deleteServerSecret(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			name, err := req.RequireString("server_name")
+			name, err := requireServerName(req, "server_name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -397,7 +433,7 @@ func initServerDirectory(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			name, err := req.RequireString("server_name")
+			name, err := requireServerName(req, "server_name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -416,7 +452,7 @@ func deleteServerDirectory(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			name, err := req.RequireString("server_name")
+			name, err := requireServerName(req, "server_name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -436,7 +472,7 @@ func executeRCONCommand(d *Deps) server.ServerTool {
 			mcp.WithString("command", mcp.Required(), mcp.Description("RCON command to execute")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			name, err := req.RequireString("server_name")
+			name, err := requireServerName(req, "server_name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -460,7 +496,7 @@ func listBackups(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			name, err := req.RequireString("server_name")
+			name, err := requireServerName(req, "server_name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -480,7 +516,7 @@ func createBackup(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			name, err := req.RequireString("server_name")
+			name, err := requireServerName(req, "server_name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}

@@ -294,6 +294,115 @@ job "test-job" {
 	}
 }
 
+func TestValidateServerName(t *testing.T) {
+	tests := []struct {
+		name    string
+		wantErr bool
+	}{
+		{"mc-atm10", false},
+		{"a", false},              // single char ok for server names
+		{"mc-test-server", false}, // valid
+		{"ABC", true},             // uppercase not allowed
+		{"-start", true},          // can't start with hyphen
+		{"a/../etc", true},        // path traversal rejected
+		{"mc_test", true},         // underscore not allowed
+		{"", true},                // empty
+		{"valid-name-123", false}, // valid
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateServerName(tt.name)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateServerName(%q) error = %v, wantErr %v", tt.name, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateAllocID(t *testing.T) {
+	tests := []struct {
+		id      string
+		wantErr bool
+	}{
+		{"a1b2c3d4-e5f6-7890-abcd-ef1234567890", false}, // valid UUID
+		{"not-a-uuid", true},
+		{"", true},
+		{"../../../etc/passwd", true},
+		{"A1B2C3D4-E5F6-7890-ABCD-EF1234567890", true}, // uppercase not allowed
+	}
+	for _, tt := range tests {
+		t.Run(tt.id, func(t *testing.T) {
+			err := ValidateAllocID(tt.id)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateAllocID(%q) error = %v, wantErr %v", tt.id, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateJobSpec_PrivilegedVarInterpolation(t *testing.T) {
+	hcl := `
+job "test-job" {
+  group "server" {
+    task "app" {
+      driver = "docker"
+      config {
+        privileged = var.priv
+        volumes = ["/mnt/fast/data/test:/data"]
+      }
+      resources { cpu = 1000; memory = 1024 }
+    }
+  }
+}
+`
+	err := ValidateJobSpec(hcl, nil)
+	if err == nil {
+		t.Fatal("expected error for privileged = var.priv (variable interpolation)")
+	}
+}
+
+func TestValidateJobSpec_NetworkModeVarInterpolation(t *testing.T) {
+	hcl := `
+job "test-job" {
+  group "server" {
+    task "app" {
+      driver = "docker"
+      config {
+        network_mode = var.net_mode
+        volumes = ["/mnt/fast/data/test:/data"]
+      }
+      resources { cpu = 1000; memory = 1024 }
+    }
+  }
+}
+`
+	err := ValidateJobSpec(hcl, nil)
+	if err == nil {
+		t.Fatal("expected error for network_mode = var.net_mode (variable interpolation)")
+	}
+}
+
+func TestValidateJobSpec_NetworkModeBridgeAllowed(t *testing.T) {
+	hcl := `
+job "test-job" {
+  group "server" {
+    task "app" {
+      driver = "docker"
+      config {
+        network_mode = "bridge"
+        volumes = ["/mnt/fast/data/test:/data"]
+      }
+      resources { cpu = 1000; memory = 1024 }
+    }
+  }
+}
+`
+	err := ValidateJobSpec(hcl, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateJobName(t *testing.T) {
 	tests := []struct {
 		name  string

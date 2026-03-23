@@ -16,6 +16,29 @@ var DefaultArtifactAllowlist = []string{
 // jobNamePattern validates Nomad job IDs.
 var jobNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$`)
 
+// serverNamePattern validates server names used in URL paths.
+// Must match vault-gateway's pattern: ^[a-z0-9][a-z0-9-]{0,47}$
+var serverNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,47}$`)
+
+// allocIDPattern validates Nomad allocation UUIDs.
+var allocIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+// ValidateServerName checks if a server name is safe for use in URL paths.
+func ValidateServerName(name string) error {
+	if !serverNamePattern.MatchString(name) {
+		return fmt.Errorf("invalid server name %q: must match ^[a-z0-9][a-z0-9-]{0,47}$", name)
+	}
+	return nil
+}
+
+// ValidateAllocID checks if an allocation ID is a valid UUID.
+func ValidateAllocID(id string) error {
+	if !allocIDPattern.MatchString(id) {
+		return fmt.Errorf("invalid allocation ID %q: must be a UUID", id)
+	}
+	return nil
+}
+
 // Error holds all validation failures.
 type Error struct {
 	Errors []string
@@ -56,11 +79,17 @@ func ValidateJobSpec(hcl string, extraAllowlist []string) error {
 	}
 
 	// 2. Security rules.
-	if containsField(hcl, "network_mode", "host") {
-		errs = append(errs, "network_mode = \"host\" is not allowed")
+	// Reject network_mode unless it's a known-safe value.
+	if nmVal := extractFieldValue(hcl, "network_mode"); nmVal != "" {
+		if nmVal != "bridge" && nmVal != "none" {
+			errs = append(errs, fmt.Sprintf("network_mode = %q is not allowed (must be \"bridge\" or \"none\")", nmVal))
+		}
 	}
-	if containsField(hcl, "privileged", "true") {
-		errs = append(errs, "privileged = true is not allowed")
+	// Reject privileged unless explicitly false.
+	if privVal := extractFieldValue(hcl, "privileged"); privVal != "" {
+		if privVal != "false" {
+			errs = append(errs, fmt.Sprintf("privileged = %q is not allowed (must be false or omitted)", privVal))
+		}
 	}
 
 	// Check volume mounts.
@@ -104,6 +133,22 @@ func containsField(hcl, field, value string) bool {
 	// Match field = "value" or field = value (for booleans)
 	pattern := regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(field) + `\s*=\s*"?` + regexp.QuoteMeta(value) + `"?`)
 	return pattern.MatchString(hcl)
+}
+
+// fieldValueRe matches a field assignment and captures the raw value (quoted or unquoted).
+var fieldValueRe = func(field string) *regexp.Regexp {
+	return regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(field) + `\s*=\s*"?([^"\s]+)"?`)
+}
+
+// extractFieldValue returns the value of a field assignment, or "" if not found.
+// Strips quotes so "host" returns "host" and true returns "true".
+func extractFieldValue(hcl, field string) string {
+	re := fieldValueRe(field)
+	m := re.FindStringSubmatch(hcl)
+	if len(m) >= 2 {
+		return m[1]
+	}
+	return ""
 }
 
 var jobNameRe = regexp.MustCompile(`(?m)^\s*job\s+"([^"]+)"`)

@@ -34,3 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Provisioning order: DNS first to maximize propagation time (DNS → secret → directory → job → health)
+
+### Fixed
+
+- Server name validation at MCP tool boundary — all tools now validate names against `^[a-z0-9][a-z0-9-]{0,47}$` before gateway calls (prevents path traversal)
+- Job ID and allocation ID validation in read operations (UUID pattern for alloc IDs)
+- HCL validation: `privileged` and `network_mode` now reject variable interpolation (e.g. `var.priv`) — only safe literals accepted
+- Retry and circuit breaker wired into all gateway clients via `clients.Base`
+- Fixed `_ = append(steps, "job")` ineffectual assignment in orchestration provisioning

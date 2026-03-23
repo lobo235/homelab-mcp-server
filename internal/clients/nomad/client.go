@@ -69,6 +69,11 @@ func NewClient(baseURL, apiKey string) *Client {
 	return &Client{base: clients.NewBase(baseURL, apiKey)}
 }
 
+// NewClientWithBase creates a client using a pre-configured Base (with retry/circuit breaker).
+func NewClientWithBase(base *clients.Base) *Client {
+	return &Client{base: base}
+}
+
 // Ping checks gateway reachability.
 func (c *Client) Ping(ctx context.Context) error {
 	return c.base.Ping(ctx)

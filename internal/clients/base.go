@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand/v2"
+	"net"
 	"net/http"
 	"time"
 )
@@ -27,6 +29,23 @@ type Base struct {
 	httpClient *http.Client
 	baseURL    string
 	apiKey     string
+
+	retryConfig *RetryConfig
+	cb          CircuitBreaker
+}
+
+// RetryConfig holds retry policy configuration for gateway calls.
+type RetryConfig struct {
+	MaxRetries int
+	BaseDelay  time.Duration
+	MaxJitter  time.Duration
+}
+
+// CircuitBreaker allows or blocks requests based on failure patterns.
+type CircuitBreaker interface {
+	Allow() error
+	RecordSuccess()
+	RecordFailure()
 }
 
 // NewBase creates a new base gateway client.
@@ -38,35 +57,122 @@ func NewBase(baseURL, apiKey string) *Base {
 	}
 }
 
-// Do executes an HTTP request against the gateway, adding auth and trace headers.
-func (b *Base) Do(ctx context.Context, method, path string, body any) (*http.Response, error) {
-	url := b.baseURL + path
+// WithRetry configures retry policy on the base client.
+func (b *Base) WithRetry(cfg RetryConfig) *Base {
+	b.retryConfig = &cfg
+	return b
+}
 
-	var bodyReader io.Reader
+// WithCircuitBreaker configures a circuit breaker on the base client.
+func (b *Base) WithCircuitBreaker(cb CircuitBreaker) *Base {
+	b.cb = cb
+	return b
+}
+
+// Do executes an HTTP request against the gateway, adding auth and trace headers.
+// If a circuit breaker is configured, it checks/records state.
+// If retry is configured, transient errors (503, network) are retried.
+func (b *Base) Do(ctx context.Context, method, path string, body any) (*http.Response, error) {
+	// Check circuit breaker before making the call.
+	if b.cb != nil {
+		if err := b.cb.Allow(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Marshal body once (for retries).
+	var bodyData []byte
 	if body != nil {
-		data, err := json.Marshal(body)
+		var err error
+		bodyData, err = json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("marshal request body: %w", err)
 		}
-		bodyReader = bytes.NewReader(data)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+	doOnce := func() (*http.Response, error) {
+		var bodyReader io.Reader
+		if bodyData != nil {
+			bodyReader = bytes.NewReader(bodyData)
+		}
+
+		url := b.baseURL + path
+		req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+		if err != nil {
+			return nil, fmt.Errorf("create request: %w", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+b.apiKey)
+		if bodyData != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+
+		// Propagate trace ID from context if present.
+		if traceID, ok := ctx.Value(traceIDKey).(string); ok && traceID != "" {
+			req.Header.Set("X-Trace-ID", traceID)
+		}
+
+		return b.httpClient.Do(req)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+b.apiKey)
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	// Without retry, just call once.
+	if b.retryConfig == nil {
+		resp, err := doOnce()
+		b.recordResult(err)
+		return resp, err
 	}
 
-	// Propagate trace ID from context if present.
-	if traceID, ok := ctx.Value(traceIDKey).(string); ok && traceID != "" {
-		req.Header.Set("X-Trace-ID", traceID)
+	// With retry: wrap in retry loop.
+	var lastResp *http.Response
+	var lastErr error
+	for attempt := 0; attempt <= b.retryConfig.MaxRetries; attempt++ {
+		lastResp, lastErr = doOnce()
+		if lastErr == nil {
+			b.recordResult(nil)
+			return lastResp, nil
+		}
+
+		if !b.isRetryable(lastErr) || attempt == b.retryConfig.MaxRetries {
+			break
+		}
+
+		delay := b.retryConfig.BaseDelay * time.Duration(1<<uint(attempt))
+		jitter := time.Duration(rand.Int64N(int64(b.retryConfig.MaxJitter*2))) - b.retryConfig.MaxJitter
+		delay += jitter
+
+		select {
+		case <-ctx.Done():
+			b.recordResult(ctx.Err())
+			return nil, ctx.Err()
+		case <-time.After(delay):
+		}
 	}
 
-	return b.httpClient.Do(req)
+	b.recordResult(lastErr)
+	return lastResp, lastErr
+}
+
+// recordResult updates the circuit breaker with success/failure.
+func (b *Base) recordResult(err error) {
+	if b.cb == nil {
+		return
+	}
+	if err == nil {
+		b.cb.RecordSuccess()
+	} else {
+		b.cb.RecordFailure()
+	}
+}
+
+// isRetryable checks if an error is transient.
+func (b *Base) isRetryable(err error) bool {
+	if ge, ok := err.(*GatewayError); ok {
+		return ge.StatusCode == 503
+	}
+	if _, ok := err.(net.Error); ok {
+		return true
+	}
+	return false
 }
 
 // DoJSON executes an HTTP request and decodes the JSON response into result.
@@ -123,6 +229,25 @@ func (b *Base) Ping(ctx context.Context) error {
 // BaseURL returns the configured base URL.
 func (b *Base) BaseURL() string {
 	return b.baseURL
+}
+
+// DefaultRetryConfig returns the standard retry configuration:
+// 3 retries with exponential backoff from 100ms and ±25ms jitter.
+func DefaultRetryConfig() RetryConfig {
+	return RetryConfig{
+		MaxRetries: 3,
+		BaseDelay:  100 * time.Millisecond,
+		MaxJitter:  25 * time.Millisecond,
+	}
+}
+
+// NewBaseWithResilience creates a Base client pre-configured with retry and circuit breaker.
+func NewBaseWithResilience(baseURL, apiKey string, cb CircuitBreaker) *Base {
+	b := NewBase(baseURL, apiKey)
+	cfg := DefaultRetryConfig()
+	b.retryConfig = &cfg
+	b.cb = cb
+	return b
 }
 
 func parseGatewayError(resp *http.Response) *GatewayError {

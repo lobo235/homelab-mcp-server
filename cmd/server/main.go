@@ -10,6 +10,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/mark3labs/mcp-go/server"
 
+	"github.com/lobo235/homelab-mcp-server/internal/clients"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/adguard"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/cloudflare"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/curseforge"
@@ -19,6 +20,7 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/config"
 	"github.com/lobo235/homelab-mcp-server/internal/itzgcache"
 	"github.com/lobo235/homelab-mcp-server/internal/prompts"
+	"github.com/lobo235/homelab-mcp-server/internal/resilience"
 	"github.com/lobo235/homelab-mcp-server/internal/speccache"
 	"github.com/lobo235/homelab-mcp-server/internal/tools/atomic"
 	"github.com/lobo235/homelab-mcp-server/internal/tools/highlevel"
@@ -45,13 +47,19 @@ func main() {
 	// Re-create logger at the configured level.
 	log = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: cfg.SlogLevel()}))
 
-	// Create gateway clients.
-	nomadClient := nomad.NewClient(cfg.NomadGatewayURL, cfg.NomadGatewayKey)
-	adguardClient := adguard.NewClient(cfg.AdguardGatewayURL, cfg.AdguardGatewayKey)
-	cfClient := cloudflare.NewClient(cfg.CFGatewayURL, cfg.CFGatewayKey)
-	mcClient := minecraft.NewClient(cfg.MinecraftGatewayURL, cfg.MinecraftGatewayKey)
-	curseforgeClient := curseforge.NewClient(cfg.CurseforgeGatewayURL, cfg.CurseforgeGatewayKey)
-	vaultClient := vault.NewClient(cfg.VaultGatewayURL, cfg.VaultGatewayKey)
+	// Create gateway clients with retry + circuit breaker.
+	nomadClient := nomad.NewClientWithBase(
+		clients.NewBaseWithResilience(cfg.NomadGatewayURL, cfg.NomadGatewayKey, resilience.DefaultCircuitBreaker()))
+	adguardClient := adguard.NewClientWithBase(
+		clients.NewBaseWithResilience(cfg.AdguardGatewayURL, cfg.AdguardGatewayKey, resilience.DefaultCircuitBreaker()))
+	cfClient := cloudflare.NewClientWithBase(
+		clients.NewBaseWithResilience(cfg.CFGatewayURL, cfg.CFGatewayKey, resilience.DefaultCircuitBreaker()))
+	mcClient := minecraft.NewClientWithBase(
+		clients.NewBaseWithResilience(cfg.MinecraftGatewayURL, cfg.MinecraftGatewayKey, resilience.DefaultCircuitBreaker()))
+	curseforgeClient := curseforge.NewClientWithBase(
+		clients.NewBaseWithResilience(cfg.CurseforgeGatewayURL, cfg.CurseforgeGatewayKey, resilience.DefaultCircuitBreaker()))
+	vaultClient := vault.NewClientWithBase(
+		clients.NewBaseWithResilience(cfg.VaultGatewayURL, cfg.VaultGatewayKey, resilience.DefaultCircuitBreaker()))
 
 	// Startup health checks — log warnings for unreachable gateways.
 	checkGatewayHealth(log, "nomad-gateway", nomadClient)
