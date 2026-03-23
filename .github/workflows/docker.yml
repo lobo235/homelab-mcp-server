@@ -56,7 +56,7 @@ jobs:
             VERSION=${{ steps.version.outputs.version }}
 
       - name: Notify homelab-chatbot to rebuild
-        if: success()
+        if: success() && github.ref == 'refs/heads/main'
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.DISPATCH_TOKEN }}
