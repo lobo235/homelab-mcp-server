@@ -18,4 +18,7 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=builder /build/homelab-mcp-server .
 
+RUN adduser -D -u 1000 appuser
+USER appuser
+
 ENTRYPOINT ["/app/homelab-mcp-server"]
