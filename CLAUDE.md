@@ -158,7 +158,9 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `create_backup` | minecraft | Create server backup |
 | `validate_modpack` | curseforge | Validate a CurseForge modpack |
 | `get_modpack_files` | curseforge | List modpack file versions |
+| `get_modpack_file` | curseforge | Get specific modpack file by file ID |
 | `validate_mod` | curseforge | Validate a CurseForge mod |
+| `get_mod_file` | curseforge | Get specific mod file by file ID |
 
 ### Layer 2 — Orchestration Tools
 

@@ -4,29 +4,36 @@ package minecraft
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/lobo235/homelab-mcp-server/internal/clients"
 )
 
-// Server represents a Minecraft server directory entry.
-type Server struct {
-	Name string `json:"name"`
-}
-
 // FileEntry represents a file in a server directory.
 type FileEntry struct {
-	Name  string `json:"name"`
-	Size  int64  `json:"size"`
-	IsDir bool   `json:"is_dir"`
+	Name    string `json:"name"`
+	Size    int64  `json:"size"`
+	IsDir   bool   `json:"is_dir"`
+	ModTime string `json:"mod_time"`
 }
 
-// Backup represents a backup entry.
-type Backup struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Size      int64  `json:"size"`
-	CreatedAt string `json:"created_at"`
+// BackupInfo represents a backup file entry from the list endpoint.
+type BackupInfo struct {
+	ID      string `json:"id"`
+	Path    string `json:"path"`
+	Size    int64  `json:"size"`
+	Created string `json:"created"`
+}
+
+// BackupStatus represents backup status from create/get endpoints.
+type BackupStatus struct {
+	Server      string `json:"server"`
+	ID          string `json:"id,omitempty"`
+	BackupID    string `json:"backup_id,omitempty"`
+	Status      string `json:"status"`
+	StartedAt   string `json:"started_at,omitempty"`
+	CompletedAt string `json:"completed_at,omitempty"`
+	BackupPath  string `json:"backup_path,omitempty"`
+	Error       string `json:"error,omitempty"`
 }
 
 // RCONRequest represents an RCON command request.
@@ -59,13 +66,15 @@ func (c *Client) Ping(ctx context.Context) error {
 	return c.base.Ping(ctx)
 }
 
-// ListServers returns all server directories.
-func (c *Client) ListServers(ctx context.Context) ([]Server, error) {
-	var servers []Server
-	if err := c.base.DoJSON(ctx, "GET", "/servers", nil, &servers); err != nil {
+// ListServers returns all server directory names.
+func (c *Client) ListServers(ctx context.Context) ([]string, error) {
+	var envelope struct {
+		Servers []string `json:"servers"`
+	}
+	if err := c.base.DoJSON(ctx, "GET", "/servers", nil, &envelope); err != nil {
 		return nil, fmt.Errorf("list servers: %w", err)
 	}
-	return servers, nil
+	return envelope.Servers, nil
 }
 
 // initServerRequest is the JSON body for POST /servers.
@@ -93,59 +102,60 @@ func (c *Client) DeleteServer(ctx context.Context, name string) error {
 }
 
 // ListFiles returns files in a server directory.
-func (c *Client) ListFiles(ctx context.Context, name string) ([]FileEntry, error) {
-	var files []FileEntry
-	if err := c.base.DoJSON(ctx, "GET", "/servers/"+name+"/files", nil, &files); err != nil {
+func (c *Client) ListFiles(ctx context.Context, name, subPath string) ([]FileEntry, error) {
+	var envelope struct {
+		Files []FileEntry `json:"files"`
+	}
+	path := "/servers/" + name + "/files"
+	if subPath != "" {
+		path += "?path=" + subPath
+	}
+	if err := c.base.DoJSON(ctx, "GET", path, nil, &envelope); err != nil {
 		return nil, fmt.Errorf("list files for %q: %w", name, err)
 	}
-	return files, nil
+	return envelope.Files, nil
 }
 
-// ReadFile reads a file from a server directory.
-func (c *Client) ReadFile(ctx context.Context, name string) ([]byte, error) {
-	resp, err := c.base.Do(ctx, "GET", "/servers/"+name+"/files/read", nil)
-	if err != nil {
-		return nil, fmt.Errorf("read file for %q: %w", name, err)
+// ReadFile reads a file from a server directory and returns the content string.
+func (c *Client) ReadFile(ctx context.Context, name, filePath string) (string, error) {
+	var envelope struct {
+		Content string `json:"content"`
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("read file for %q: HTTP %d", name, resp.StatusCode)
+	path := "/servers/" + name + "/files/read?path=" + filePath
+	if err := c.base.DoJSON(ctx, "GET", path, nil, &envelope); err != nil {
+		return "", fmt.Errorf("read file for %q: %w", name, err)
 	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read file body for %q: %w", name, err)
-	}
-	return data, nil
+	return envelope.Content, nil
 }
 
 // ListBackups returns backups for a server.
-func (c *Client) ListBackups(ctx context.Context, name string) ([]Backup, error) {
-	var backups []Backup
-	if err := c.base.DoJSON(ctx, "GET", "/servers/"+name+"/backups", nil, &backups); err != nil {
+func (c *Client) ListBackups(ctx context.Context, name string) ([]BackupInfo, error) {
+	var envelope struct {
+		Backups []BackupInfo `json:"backups"`
+	}
+	if err := c.base.DoJSON(ctx, "GET", "/servers/"+name+"/backups", nil, &envelope); err != nil {
 		return nil, fmt.Errorf("list backups for %q: %w", name, err)
 	}
-	return backups, nil
+	return envelope.Backups, nil
 }
 
 // CreateBackup triggers a backup for a server.
-func (c *Client) CreateBackup(ctx context.Context, name string) (*Backup, error) {
-	var backup Backup
-	if err := c.base.DoJSON(ctx, "POST", "/servers/"+name+"/backups", nil, &backup); err != nil {
+func (c *Client) CreateBackup(ctx context.Context, name string) (*BackupStatus, error) {
+	var status BackupStatus
+	if err := c.base.DoJSON(ctx, "POST", "/servers/"+name+"/backups", nil, &status); err != nil {
 		return nil, fmt.Errorf("create backup for %q: %w", name, err)
 	}
-	return &backup, nil
+	return &status, nil
 }
 
-// GetBackup returns a specific backup.
-func (c *Client) GetBackup(ctx context.Context, name, backupID string) (*Backup, error) {
-	var backup Backup
+// GetBackupStatus returns the status of a specific backup.
+func (c *Client) GetBackupStatus(ctx context.Context, name, backupID string) (*BackupStatus, error) {
+	var status BackupStatus
 	path := fmt.Sprintf("/servers/%s/backups/%s", name, backupID)
-	if err := c.base.DoJSON(ctx, "GET", path, nil, &backup); err != nil {
-		return nil, fmt.Errorf("get backup %q for %q: %w", backupID, name, err)
+	if err := c.base.DoJSON(ctx, "GET", path, nil, &status); err != nil {
+		return nil, fmt.Errorf("get backup status %q for %q: %w", backupID, name, err)
 	}
-	return &backup, nil
+	return &status, nil
 }
 
 // Restore triggers a restore for a server.

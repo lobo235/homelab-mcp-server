@@ -3,6 +3,7 @@ package atomic
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -104,7 +105,9 @@ func Register(s *server.MCPServer, d *Deps) {
 		// CurseForge tools
 		validateModpack(d),
 		getModpackFiles(d),
+		getModpackFile(d),
 		validateMod(d),
+		getModFile(d),
 	)
 }
 
@@ -198,7 +201,7 @@ func getJobLogs(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			return mcp.NewToolResultJSON(logs)
+			return mcp.NewToolResultText(logs), nil
 		},
 	}
 }
@@ -577,6 +580,32 @@ func getModpackFiles(d *Deps) server.ServerTool {
 	}
 }
 
+func getModpackFile(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("get_modpack_file",
+			mcp.WithDescription("Get details of a specific modpack file by file ID (useful for fetching server pack info via serverPackFileId)"),
+			mcp.WithString("project_id", mcp.Required(), mcp.Description("CurseForge project ID")),
+			mcp.WithString("file_id", mcp.Required(), mcp.Description("CurseForge file ID")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			projectID, err := req.RequireString("project_id")
+			if err != nil {
+				return mcp.NewToolResultError("project_id is required"), nil
+			}
+			fileID, err := req.RequireString("file_id")
+			if err != nil {
+				return mcp.NewToolResultError("file_id is required"), nil
+			}
+			file, err := d.Curseforge.GetModpackFile(ctx, projectID, fileID)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			data, _ := json.Marshal(file)
+			return mcp.NewToolResultText(string(data)), nil
+		},
+	}
+}
+
 func validateMod(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("validate_mod",
@@ -593,6 +622,32 @@ func validateMod(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultJSON(mod)
+		},
+	}
+}
+
+func getModFile(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("get_mod_file",
+			mcp.WithDescription("Get details of a specific mod file by file ID"),
+			mcp.WithString("project_id", mcp.Required(), mcp.Description("CurseForge project ID")),
+			mcp.WithString("file_id", mcp.Required(), mcp.Description("CurseForge file ID")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			projectID, err := req.RequireString("project_id")
+			if err != nil {
+				return mcp.NewToolResultError("project_id is required"), nil
+			}
+			fileID, err := req.RequireString("file_id")
+			if err != nil {
+				return mcp.NewToolResultError("file_id is required"), nil
+			}
+			file, err := d.Curseforge.GetModFile(ctx, projectID, fileID)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			data, _ := json.Marshal(file)
+			return mcp.NewToolResultText(string(data)), nil
 		},
 	}
 }

@@ -7,8 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.1.0] - 2026-03-23
+
+### Added
+- `get_modpack_file` and `get_mod_file` MCP tools for single-file lookup by file ID
+- `serverPackFileId` field in CurseForge file responses — enables discovering and fetching server pack files
+- `DoText` method on base HTTP client for plain-text gateway responses
+
 ### Changed
 - Docker build workflow resolves version from git tags for non-tag builds
+- `GetAllocationLogs` returns plain text instead of JSON — matches nomad-gateway's `text/plain` response
+- Minecraft backup types aligned with gateway response shapes (`BackupInfo` for list, `BackupStatus` for create/get)
+- `ListServers` returns `[]string` unwrapped from `{"servers": [...]}` envelope (was `[]Server`)
+- `ListFiles` unwraps `{"files": [...]}` envelope and accepts `subPath` parameter
+- `ReadFile` parses `{"content": "..."}` JSON envelope and returns string (was raw bytes)
+- `FileEntry` now includes `ModTime` field to match gateway response
+
+### Fixed
+- `get_job_logs` tool no longer fails with JSON decode error — nomad-gateway returns plain text, not JSON
+- `list_backups` tool now correctly unwraps `{"backups": [...]}` envelope from minecraft-gateway
+- `create_backup` tool now parses `{"server", "backup_id", "status"}` response from minecraft-gateway
+- `ListServers` now correctly unwraps `{"servers": [...]}` envelope from minecraft-gateway (was failing with JSON decode error)
+- `ListFiles` now correctly unwraps `{"files": [...]}` envelope from minecraft-gateway (was failing with JSON decode error)
+- `ReadFile` now correctly parses `{"content": "..."}` JSON response (was returning raw JSON bytes)
 
 ## [v1.0.3] - 2026-03-23
 

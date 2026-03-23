@@ -43,11 +43,6 @@ type HealthStatus struct {
 	Status  string `json:"status"`
 }
 
-// LogOutput represents log output from an allocation.
-type LogOutput struct {
-	Stdout string `json:"stdout"`
-	Stderr string `json:"stderr"`
-}
 
 // SubmitRequest represents a job submission request.
 type SubmitRequest struct {
@@ -163,16 +158,16 @@ func (c *Client) RestartAllocation(ctx context.Context, jobID, allocID string) e
 	return nil
 }
 
-// GetAllocationLogs returns logs for a specific allocation.
+// GetAllocationLogs returns logs for a specific allocation as plain text.
 // task is required by the nomad-gateway. logType defaults to "stdout" if empty.
-func (c *Client) GetAllocationLogs(ctx context.Context, jobID, allocID, task, logType string) (*LogOutput, error) {
+func (c *Client) GetAllocationLogs(ctx context.Context, jobID, allocID, task, logType string) (string, error) {
 	if logType == "" {
 		logType = "stdout"
 	}
-	var logs LogOutput
 	path := fmt.Sprintf("/jobs/%s/allocations/%s/logs?task=%s&type=%s", jobID, allocID, task, logType)
-	if err := c.base.DoJSON(ctx, "GET", path, nil, &logs); err != nil {
-		return nil, fmt.Errorf("get allocation logs %q: %w", allocID, err)
+	text, err := c.base.DoText(ctx, "GET", path, nil)
+	if err != nil {
+		return "", fmt.Errorf("get allocation logs %q: %w", allocID, err)
 	}
-	return &logs, nil
+	return text, nil
 }

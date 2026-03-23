@@ -29,9 +29,10 @@ type ModpackFile struct {
 	FileName     string   `json:"fileName"`
 	GameVersions []string `json:"gameVersions"`
 	IsServerPack bool     `json:"isServerPack"`
-	DownloadURL  string   `json:"downloadUrl"`
-	FileLength   int64    `json:"fileLength"`
-	ReleaseType  int      `json:"releaseType"`
+	DownloadURL      string   `json:"downloadUrl"`
+	FileLength       int64    `json:"fileLength"`
+	ReleaseType      int      `json:"releaseType"`
+	ServerPackFileID int      `json:"serverPackFileId"`
 }
 
 // Client wraps the curseforge-gateway HTTP API.
@@ -88,4 +89,24 @@ func (c *Client) GetModFiles(ctx context.Context, projectID string) ([]ModpackFi
 		return nil, fmt.Errorf("get mod files %s: %w", projectID, err)
 	}
 	return files, nil
+}
+
+// GetModpackFile returns a single file for a modpack by file ID.
+func (c *Client) GetModpackFile(ctx context.Context, projectID, fileID string) (*ModpackFile, error) {
+	var file ModpackFile
+	path := fmt.Sprintf("/modpacks/%s/files/%s", projectID, fileID)
+	if err := c.base.DoJSON(ctx, "GET", path, nil, &file); err != nil {
+		return nil, fmt.Errorf("get modpack file %s/%s: %w", projectID, fileID, err)
+	}
+	return &file, nil
+}
+
+// GetModFile returns a single file for a mod by file ID.
+func (c *Client) GetModFile(ctx context.Context, projectID, fileID string) (*ModpackFile, error) {
+	var file ModpackFile
+	path := fmt.Sprintf("/mods/%s/files/%s", projectID, fileID)
+	if err := c.base.DoJSON(ctx, "GET", path, nil, &file); err != nil {
+		return nil, fmt.Errorf("get mod file %s/%s: %w", projectID, fileID, err)
+	}
+	return &file, nil
 }

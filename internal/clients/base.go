@@ -197,6 +197,27 @@ func (b *Base) DoJSON(ctx context.Context, method, path string, body, result any
 	return nil
 }
 
+// DoText executes an HTTP request and returns the response body as a string.
+// Returns a *GatewayError for non-2xx status codes.
+func (b *Base) DoText(ctx context.Context, method, path string, body any) (string, error) {
+	resp, err := b.Do(ctx, method, path, body)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", parseGatewayError(resp)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read response body: %w", err)
+	}
+
+	return string(data), nil
+}
+
 // DoNoContent executes an HTTP request expecting a 2xx response with no body.
 func (b *Base) DoNoContent(ctx context.Context, method, path string, body any) error {
 	resp, err := b.Do(ctx, method, path, body)
