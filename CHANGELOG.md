@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.0.0] - 2026-03-23
+
 ### Fixed
 
 - InitServer now calls `POST /servers` with JSON body (`name`, `uid`, `gid`) instead of `POST /servers/{name}` with nil body, matching the minecraft-gateway API
