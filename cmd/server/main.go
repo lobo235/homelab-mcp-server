@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 	"github.com/mark3labs/mcp-go/server"
@@ -16,7 +17,9 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/vault"
 	"github.com/lobo235/homelab-mcp-server/internal/config"
+	"github.com/lobo235/homelab-mcp-server/internal/itzhcache"
 	"github.com/lobo235/homelab-mcp-server/internal/prompts"
+	"github.com/lobo235/homelab-mcp-server/internal/speccache"
 	"github.com/lobo235/homelab-mcp-server/internal/tools/atomic"
 	"github.com/lobo235/homelab-mcp-server/internal/tools/highlevel"
 	"github.com/lobo235/homelab-mcp-server/internal/tools/orchestration"
@@ -57,6 +60,44 @@ func main() {
 	checkGatewayHealth(log, "minecraft-gateway", mcClient)
 	checkGatewayHealth(log, "curseforge-gateway", curseforgeClient)
 	checkGatewayHealth(log, "vault-gateway", vaultClient)
+
+	// Seed spec cache (fetches all job specs if cache dir is empty).
+	specCacheDir := filepath.Join(cfg.DataDir, "spec-cache")
+	specCache, err := speccache.New(specCacheDir, log)
+	if err != nil {
+		log.Error("spec-cache init failed", "error", err)
+		os.Exit(1)
+	}
+	seedFn := func(ctx context.Context) (map[string]string, error) {
+		jobs, listErr := nomadClient.ListJobs(ctx)
+		if listErr != nil {
+			return nil, listErr
+		}
+		specs := make(map[string]string, len(jobs))
+		for _, job := range jobs {
+			spec, specErr := nomadClient.GetJobSpec(ctx, job.ID)
+			if specErr != nil {
+				log.Warn("spec-cache: skipping job", "job", job.ID, "error", specErr)
+				continue
+			}
+			specs[job.ID] = spec
+		}
+		return specs, nil
+	}
+	if seedErr := specCache.Seed(context.Background(), seedFn); seedErr != nil {
+		log.Warn("spec-cache seed failed", "error", seedErr)
+	}
+
+	// Start itzg docs cache with background refresh.
+	itzgCacheDir := filepath.Join(cfg.DataDir, "itzg-docs")
+	itzgCache, err := itzhcache.New(itzgCacheDir, log)
+	if err != nil {
+		log.Error("itzg-cache init failed", "error", err)
+		os.Exit(1)
+	}
+	itzgCtx, itzgCancel := context.WithCancel(context.Background())
+	defer itzgCancel()
+	itzgCache.StartBackgroundRefresh(itzgCtx, cfg.ItzgDocsRefreshInterval)
 
 	// Create MCP server.
 	s := server.NewMCPServer(

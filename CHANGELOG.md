@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Makefile with standard targets (build, test, cover, lint, run, hooks, clean)
 - Dockerfile (multi-stage: golang:1.26-alpine -> alpine:3.21)
 - .golangci.yml with strict linter config
+- Spec cache: on-disk caching of Nomad job specs, auto-seeded from nomad-gateway on startup
+- itzg docs cache: background goroutine fetches and refreshes itzg/docker-minecraft-server docs
 - Pre-commit hook (lint + test)
 
 ### Changed
