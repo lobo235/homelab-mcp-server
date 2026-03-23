@@ -140,7 +140,7 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `list_running_jobs` | nomad | List all running Nomad jobs |
 | `get_job_spec` | nomad | Get original HCL spec for a job |
 | `get_job_status` | nomad | Get job status + allocations |
-| `get_job_logs` | nomad | Get allocation logs |
+| `get_job_logs` | nomad | Get allocation logs (requires `task`, optional `log_type`) |
 | `submit_nomad_job` | nomad | Submit HCL job spec (with pre-flight validation) |
 | `stop_nomad_job` | nomad | Stop/purge a job |
 | `restart_nomad_allocation` | nomad | Restart an allocation |

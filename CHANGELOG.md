@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Docker build workflow resolves version from git tags for non-tag builds
+
+## [v1.0.2] - 2026-03-23
+
 ### Fixed
 - `get_job_spec` tool now correctly parses the `Source` field from nomad-gateway response (was reading wrong JSON field name, returning empty specs)
 - `get_job_logs` tool now passes required `task` parameter to nomad-gateway logs endpoint (was returning 400 `missing_param` error)
