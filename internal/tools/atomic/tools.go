@@ -437,7 +437,7 @@ func initServerDirectory(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			if err := d.Minecraft.InitServer(ctx, name); err != nil {
+			if err := d.Minecraft.InitServer(ctx, name, 1000, 1000); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultText(fmt.Sprintf("Server directory initialized for %q", name)), nil

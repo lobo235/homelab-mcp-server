@@ -68,9 +68,17 @@ func (c *Client) ListServers(ctx context.Context) ([]Server, error) {
 	return servers, nil
 }
 
+// initServerRequest is the JSON body for POST /servers.
+type initServerRequest struct {
+	Name string `json:"name"`
+	UID  int    `json:"uid"`
+	GID  int    `json:"gid"`
+}
+
 // InitServer creates a new server directory.
-func (c *Client) InitServer(ctx context.Context, name string) error {
-	if err := c.base.DoNoContent(ctx, "POST", "/servers/"+name, nil); err != nil {
+func (c *Client) InitServer(ctx context.Context, name string, uid, gid int) error {
+	body := initServerRequest{Name: name, UID: uid, GID: gid}
+	if err := c.base.DoNoContent(ctx, "POST", "/servers", body); err != nil {
 		return fmt.Errorf("init server %q: %w", name, err)
 	}
 	return nil
@@ -78,7 +86,7 @@ func (c *Client) InitServer(ctx context.Context, name string) error {
 
 // DeleteServer deletes a server directory.
 func (c *Client) DeleteServer(ctx context.Context, name string) error {
-	if err := c.base.DoNoContent(ctx, "DELETE", "/servers/"+name, nil); err != nil {
+	if err := c.base.DoNoContent(ctx, "DELETE", "/servers/"+name+"?confirm=true", nil); err != nil {
 		return fmt.Errorf("delete server %q: %w", name, err)
 	}
 	return nil

@@ -109,7 +109,7 @@ func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[stri
 
 	// Step 3: Init NFS server directory.
 	d.Log.Info("provision: init directory", "server", name)
-	if err := d.Minecraft.InitServer(ctx, name); err != nil {
+	if err := d.Minecraft.InitServer(ctx, name, 1000, 1000); err != nil {
 		d.rollbackProvision(ctx, name, steps)
 		return nil, fmt.Errorf("step 3/5 init directory failed: %w", err)
 	}

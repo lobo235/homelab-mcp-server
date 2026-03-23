@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- InitServer now calls `POST /servers` with JSON body (`name`, `uid`, `gid`) instead of `POST /servers/{name}` with nil body, matching the minecraft-gateway API
+- DeleteServer now includes `?confirm=true` query parameter required by the minecraft-gateway API
+
 ### Added
 
 - Initial project scaffold: go.mod, cmd/server/main.go, internal/ layout
