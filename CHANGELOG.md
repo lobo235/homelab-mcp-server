@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- `get_job_spec` tool now correctly parses the `Source` field from nomad-gateway response (was reading wrong JSON field name, returning empty specs)
 - `get_job_logs` tool now passes required `task` parameter to nomad-gateway logs endpoint (was returning 400 `missing_param` error)
 - `get_job_logs` tool accepts optional `log_type` parameter (stdout/stderr)
 

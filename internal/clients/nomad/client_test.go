@@ -40,7 +40,7 @@ func TestClient_GetJobSpec(t *testing.T) {
 		if r.URL.Path != "/jobs/mc-atm10/spec" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(map[string]string{"spec": "job \"mc-atm10\" { }"})
+		json.NewEncoder(w).Encode(map[string]string{"Source": "job \"mc-atm10\" { }"})
 	}))
 	defer srv.Close()
 

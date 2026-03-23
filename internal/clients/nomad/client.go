@@ -100,12 +100,12 @@ func (c *Client) GetJob(ctx context.Context, jobID string) (*JobDetail, error) {
 // GetJobSpec returns the original HCL spec for a job.
 func (c *Client) GetJobSpec(ctx context.Context, jobID string) (string, error) {
 	var result struct {
-		Spec string `json:"spec"`
+		Source string `json:"Source"`
 	}
 	if err := c.base.DoJSON(ctx, "GET", "/jobs/"+jobID+"/spec", nil, &result); err != nil {
 		return "", fmt.Errorf("get job spec %q: %w", jobID, err)
 	}
-	return result.Spec, nil
+	return result.Source, nil
 }
 
 // SubmitJob submits a raw HCL job spec.
