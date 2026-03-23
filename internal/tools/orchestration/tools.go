@@ -30,6 +30,7 @@ type Deps struct {
 	CFZoneName        string
 	MCPublicDomain    string
 	ArtifactAllowlist []string
+	NFSBasePath       string
 }
 
 // Register adds all Layer 2 orchestration tools to the MCP server.
@@ -156,7 +157,7 @@ func provisionMinecraftServer(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist); err != nil {
+			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist, d.NFSBasePath); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("invalid_job_spec: %s", err.Error())), nil
 			}
 
@@ -247,7 +248,7 @@ func provisionNomadWorkload(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist); err != nil {
+			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist, d.NFSBasePath); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("invalid_job_spec: %s", err.Error())), nil
 			}
 

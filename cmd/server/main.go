@@ -127,6 +127,7 @@ func main() {
 		Log:               log,
 		CFZoneName:        cfg.CFZoneName,
 		ArtifactAllowlist: cfg.ArtifactAllowlist,
+		NFSBasePath:       cfg.NFSBasePath,
 	})
 
 	// Register Layer 2 — Orchestration tools.
@@ -140,6 +141,7 @@ func main() {
 		CFZoneName:        cfg.CFZoneName,
 		MCPublicDomain:    cfg.MCPublicDomain,
 		ArtifactAllowlist: cfg.ArtifactAllowlist,
+		NFSBasePath:       cfg.NFSBasePath,
 	})
 
 	// Register Layer 3 — High-level task tools.

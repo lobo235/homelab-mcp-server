@@ -23,7 +23,7 @@ func setRequiredEnvVars(t *testing.T) {
 		"VAULT_GATEWAY_URL":        "http://localhost:8086",
 		"VAULT_GATEWAY_KEY":        "test-key",
 		"NOMAD_DEFAULT_DATACENTER": "dc1",
-		"NFS_BASE_PATH":            "/mnt/fast/minecraft",
+		"NFS_BASE_PATH":            "/mnt/data/minecraft",
 		"MC_PUBLIC_DOMAIN":         "mc.example.com",
 		"CF_ZONE_NAME":             "example.com",
 	}

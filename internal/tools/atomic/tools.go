@@ -66,6 +66,7 @@ type Deps struct {
 
 	CFZoneName        string
 	ArtifactAllowlist []string
+	NFSBasePath       string
 }
 
 // Register adds all Layer 1 atomic tools to the MCP server.
@@ -208,7 +209,7 @@ func submitNomadJob(d *Deps) server.ServerTool {
 			}
 
 			// Pre-flight validation.
-			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist); err != nil {
+			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist, d.NFSBasePath); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("invalid_job_spec: %s", err.Error())), nil
 			}
 

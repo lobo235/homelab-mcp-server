@@ -4,6 +4,8 @@ import (
 	"testing"
 )
 
+const testVolumePrefix = "/mnt/data/"
+
 const validHCL = `
 job "mc-test" {
   datacenters = ["dc1"]
@@ -15,7 +17,7 @@ job "mc-test" {
 
       config {
         image = "itzg/minecraft-server:latest"
-        volumes = ["/mnt/fast/minecraft/mc-test/data:/data"]
+        volumes = ["/mnt/data/minecraft/mc-test/data:/data"]
       }
 
       resources {
@@ -28,7 +30,7 @@ job "mc-test" {
 `
 
 func TestValidateJobSpec_Valid(t *testing.T) {
-	err := ValidateJobSpec(validHCL, nil)
+	err := ValidateJobSpec(validHCL, nil, testVolumePrefix)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -43,7 +45,7 @@ func TestValidateJobSpec_MissingJob(t *testing.T) {
     }
   }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
 		t.Fatal("expected error for missing job block")
 	}
@@ -70,7 +72,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
 		t.Fatal("expected error for network_mode = host")
 	}
@@ -90,7 +92,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
 		t.Fatal("expected error for privileged = true")
 	}
@@ -110,9 +112,9 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
-		t.Fatal("expected error for volume outside /mnt/fast/")
+		t.Fatal("expected error for volume outside /mnt/data/")
 	}
 }
 
@@ -130,7 +132,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
 		t.Fatal("expected error for disallowed artifact source")
 	}
@@ -146,14 +148,14 @@ job "test-job" {
         source = "https://raw.githubusercontent.com/lobo235/nomad-jobs/main/script.sh"
       }
       config {
-        volumes = ["/mnt/fast/minecraft/test/data:/data"]
+        volumes = ["/mnt/data/minecraft/test/data:/data"]
       }
       resources { cpu = 1000; memory = 1024 }
     }
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -169,14 +171,14 @@ job "test-job" {
         source = "https://custom.example.com/file.tar.gz"
       }
       config {
-        volumes = ["/mnt/fast/data/test:/data"]
+        volumes = ["/mnt/data/data/test:/data"]
       }
       resources { cpu = 1000; memory = 1024 }
     }
   }
 }
 `
-	err := ValidateJobSpec(hcl, []string{"custom.example.com/"})
+	err := ValidateJobSpec(hcl, []string{"custom.example.com/"}, testVolumePrefix)
 	if err != nil {
 		t.Fatalf("unexpected error with extra allowlist: %v", err)
 	}
@@ -189,14 +191,14 @@ job "BAD_NAME!" {
     task "app" {
       driver = "docker"
       config {
-        volumes = ["/mnt/fast/data/test:/data"]
+        volumes = ["/mnt/data/data/test:/data"]
       }
       resources { cpu = 1000; memory = 1024 }
     }
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
 		t.Fatal("expected error for bad job name")
 	}
@@ -209,7 +211,7 @@ job "test-job" {
     task "app" {
       driver = "docker"
       config {
-        volumes = ["/mnt/fast/data/test:/data"]
+        volumes = ["/mnt/data/data/test:/data"]
       }
       resources {
         cpu    = 100
@@ -219,7 +221,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
 		t.Fatal("expected error for cpu < 500")
 	}
@@ -232,7 +234,7 @@ job "test-job" {
     task "app" {
       driver = "docker"
       config {
-        volumes = ["/mnt/fast/data/test:/data"]
+        volumes = ["/mnt/data/data/test:/data"]
       }
       resources {
         cpu    = 0
@@ -242,7 +244,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -255,7 +257,7 @@ job "test-job" {
     task "app" {
       driver = "docker"
       config {
-        volumes = ["/mnt/fast/data/test:/data"]
+        volumes = ["/mnt/data/data/test:/data"]
       }
       resources {
         cpu    = 1000
@@ -265,7 +267,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
 		t.Fatal("expected error for memory < 512")
 	}
@@ -278,7 +280,7 @@ job "test-job" {
     task "app" {
       driver = "docker"
       config {
-        volumes = ["/mnt/fast/data/test:/data"]
+        volumes = ["/mnt/data/data/test:/data"]
       }
       resources {
         cpu    = 1000
@@ -288,7 +290,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
 		t.Fatal("expected error for memory > 32768")
 	}
@@ -348,14 +350,14 @@ job "test-job" {
       driver = "docker"
       config {
         privileged = var.priv
-        volumes = ["/mnt/fast/data/test:/data"]
+        volumes = ["/mnt/data/data/test:/data"]
       }
       resources { cpu = 1000; memory = 1024 }
     }
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
 		t.Fatal("expected error for privileged = var.priv (variable interpolation)")
 	}
@@ -369,14 +371,14 @@ job "test-job" {
       driver = "docker"
       config {
         network_mode = var.net_mode
-        volumes = ["/mnt/fast/data/test:/data"]
+        volumes = ["/mnt/data/data/test:/data"]
       }
       resources { cpu = 1000; memory = 1024 }
     }
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err == nil {
 		t.Fatal("expected error for network_mode = var.net_mode (variable interpolation)")
 	}
@@ -390,14 +392,14 @@ job "test-job" {
       driver = "docker"
       config {
         network_mode = "bridge"
-        volumes = ["/mnt/fast/data/test:/data"]
+        volumes = ["/mnt/data/data/test:/data"]
       }
       resources { cpu = 1000; memory = 1024 }
     }
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
