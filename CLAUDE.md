@@ -156,6 +156,7 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `execute_rcon_command` | minecraft | Send RCON command to server |
 | `list_backups` | minecraft | List server backups |
 | `create_backup` | minecraft | Create server backup |
+| `fetch_artifact` | — | Fetch trusted artifact content (scripts, configs) by URL |
 | `search_modpacks` | curseforge | Search CurseForge for modpacks by name |
 | `search_mods` | curseforge | Search CurseForge for mods by name |
 | `validate_modpack` | curseforge | Validate a CurseForge modpack |

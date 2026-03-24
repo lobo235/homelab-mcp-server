@@ -5,7 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
+	"strings"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -106,6 +110,9 @@ func Register(s *server.MCPServer, d *Deps) {
 		executeRCONCommand(d),
 		listBackups(d),
 		createBackup(d),
+
+		// Utility tools
+		fetchArtifact(d),
 
 		// CurseForge tools
 		searchModpacks(d),
@@ -553,6 +560,61 @@ func createBackup(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultJSON(backup)
+		},
+	}
+}
+
+func fetchArtifact(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("fetch_artifact",
+			mcp.WithDescription("Fetch the contents of a trusted artifact URL (scripts, configs). Only URLs from the artifact allowlist are permitted. Use this to read helper scripts referenced in Nomad job specs so you can understand and adapt them."),
+			mcp.WithString("url", mcp.Required(), mcp.Description("Full URL to fetch (must be on the artifact allowlist, e.g., raw.githubusercontent.com/lobo235/...)")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			rawURL, err := req.RequireString("url")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			// Validate against allowlist.
+			stripped := strings.TrimPrefix(strings.TrimPrefix(rawURL, "https://"), "http://")
+			allowlist := append([]string{}, validation.DefaultArtifactAllowlist...)
+			allowlist = append(allowlist, d.ArtifactAllowlist...)
+			allowed := false
+			for _, prefix := range allowlist {
+				if strings.HasPrefix(stripped, prefix) {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				return mcp.NewToolResultError(fmt.Sprintf("URL %q is not on the artifact allowlist", rawURL)), nil
+			}
+
+			// Ensure HTTPS.
+			fetchURL := rawURL
+			if !strings.HasPrefix(fetchURL, "https://") {
+				fetchURL = "https://" + stripped
+			}
+
+			client := &http.Client{Timeout: 15 * time.Second}
+			resp, err := client.Get(fetchURL)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("fetch failed: %s", err.Error())), nil
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				return mcp.NewToolResultError(fmt.Sprintf("fetch returned HTTP %d", resp.StatusCode)), nil
+			}
+
+			// Cap at 64KB to avoid token overload.
+			body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("read failed: %s", err.Error())), nil
+			}
+
+			return mcp.NewToolResultText(string(body)), nil
 		},
 	}
 }
