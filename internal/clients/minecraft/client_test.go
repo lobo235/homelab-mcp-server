@@ -578,7 +578,7 @@ func TestClient_ListArchiveContents(t *testing.T) {
 		if r.Method != "GET" {
 			t.Errorf("unexpected method: %s", r.Method)
 		}
-		if r.URL.Path != "/servers/atm10/archive" {
+		if r.URL.Path != "/servers/atm10/archive-contents" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		pathParam := r.URL.Query().Get("path")

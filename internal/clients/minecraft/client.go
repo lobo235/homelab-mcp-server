@@ -234,7 +234,7 @@ func (c *Client) ListArchiveContents(ctx context.Context, name, path string) ([]
 	var envelope struct {
 		Entries []ArchiveEntry `json:"entries"`
 	}
-	endpoint := "/servers/" + name + "/archive?path=" + url.QueryEscape(path)
+	endpoint := "/servers/" + name + "/archive-contents?path=" + url.QueryEscape(path)
 	if err := c.base.DoJSON(ctx, "GET", endpoint, nil, &envelope); err != nil {
 		return nil, fmt.Errorf("list archive contents for %q: %w", name, err)
 	}
