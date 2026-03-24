@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.5.1] - 2026-03-24
+
+### Fixed
+- Guard spec cache write against empty specs to prevent clobbering existing cached HCL
+- Fix `list_archive_contents` client calling wrong endpoint URL (was 404ing)
+- Add cache-busting timestamp to GitHub raw URL fetches in `fetch_artifact`
+
 ## [v1.4.1] - 2026-03-24
 
 ### Added
