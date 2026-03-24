@@ -177,20 +177,49 @@ type DownloadRequest struct {
 	GID      int    `json:"gid"`
 }
 
-// DownloadResult represents the outcome of a file download.
-type DownloadResult struct {
-	Status     string `json:"status"`
-	FilesCount int    `json:"files_count"`
-	TotalBytes int64  `json:"total_bytes"`
+// DownloadStartResult represents the response from starting an async download.
+type DownloadStartResult struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
 }
 
-// DownloadToServer downloads a file to a server directory.
-func (c *Client) DownloadToServer(ctx context.Context, name string, req DownloadRequest) (*DownloadResult, error) {
-	var result DownloadResult
+// DownloadStatus represents the status of an async download.
+type DownloadStatus struct {
+	ID          string          `json:"id"`
+	Status      string          `json:"status"`
+	URL         string          `json:"url"`
+	DestPath    string          `json:"dest_path"`
+	Extract     bool            `json:"extract"`
+	StartedAt   string          `json:"started_at"`
+	CompletedAt string          `json:"completed_at,omitempty"`
+	Result      *DownloadResult `json:"result,omitempty"`
+	Error       string          `json:"error,omitempty"`
+}
+
+// DownloadResult represents the outcome of a completed download.
+type DownloadResult struct {
+	FilesCount int   `json:"files_count"`
+	TotalBytes int64 `json:"total_bytes"`
+}
+
+// DownloadToServer starts an async file download to a server directory.
+// Returns immediately with a download ID for status polling.
+func (c *Client) DownloadToServer(ctx context.Context, name string, req DownloadRequest) (*DownloadStartResult, error) {
+	var result DownloadStartResult
 	if err := c.base.DoJSON(ctx, "POST", "/servers/"+name+"/download", req, &result); err != nil {
 		return nil, fmt.Errorf("download to %q: %w", name, err)
 	}
 	return &result, nil
+}
+
+// GetDownloadStatus returns the status of an async download.
+func (c *Client) GetDownloadStatus(ctx context.Context, name, downloadID string) (*DownloadStatus, error) {
+	var status DownloadStatus
+	path := fmt.Sprintf("/servers/%s/downloads/%s", name, downloadID)
+	if err := c.base.DoJSON(ctx, "GET", path, nil, &status); err != nil {
+		return nil, fmt.Errorf("get download status %q for %q: %w", downloadID, name, err)
+	}
+	return &status, nil
 }
 
 // ArchiveEntry represents a file inside an archive on the server filesystem.

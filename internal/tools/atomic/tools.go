@@ -111,6 +111,7 @@ func Register(s *server.MCPServer, d *Deps) {
 		listBackups(d),
 		createBackup(d),
 		downloadToServer(d),
+		getDownloadStatus(d),
 		listArchiveContents(d),
 		listServerFiles(d),
 		readServerFile(d),
@@ -599,7 +600,7 @@ func createBackup(d *Deps) server.ServerTool {
 func downloadToServer(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("download_to_server",
-			mcp.WithDescription("Download a file from CurseForge, Modrinth, or FTB to a Minecraft server directory. Handles modpack server packs (zip/tar archives), individual mods (.jar files), and config files. Use with extract=true for server pack zips that need to be unpacked into the server root."),
+			mcp.WithDescription("Start an async download of a file from CurseForge, Modrinth, or FTB to a Minecraft server directory. Returns immediately with a download ID — use get_download_status to poll for completion. Large downloads (modpack server packs) can take several minutes."),
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 			mcp.WithString("url", mcp.Required(), mcp.Description("Download URL (CurseForge, Modrinth, FTB, etc.)")),
 			mcp.WithString("dest_path", mcp.Description("Destination DIRECTORY relative to server root (default: \".\"). The downloaded file keeps its original name from the URL. E.g., \"mods\" puts mod.jar into mods/mod.jar.")),
@@ -637,6 +638,32 @@ func downloadToServer(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultJSON(result)
+		},
+	}
+}
+
+func getDownloadStatus(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("get_download_status",
+			mcp.WithDescription("Check the status of an async file download. Returns status (running/done/failed), and on completion includes files_count and total_bytes. Tell the user the download is in progress and suggest checking back in a minute for large files."),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
+			mcp.WithString("download_id", mcp.Required(), mcp.Description("Download ID returned by download_to_server")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			name, err := requireServerName(req, "server_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			downloadID, err := req.RequireString("download_id")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			dirName := mcDir(name)
+			status, err := d.Minecraft.GetDownloadStatus(ctx, dirName, downloadID)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultJSON(status)
 		},
 	}
 }

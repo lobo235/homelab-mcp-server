@@ -525,10 +525,10 @@ func TestClient_DownloadToServer(t *testing.T) {
 		if req.GID != 1001 {
 			t.Errorf("gid = %d, want %d", req.GID, 1001)
 		}
-		json.NewEncoder(w).Encode(DownloadResult{
-			Status:     "completed",
-			FilesCount: 42,
-			TotalBytes: 1048576,
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(DownloadStartResult{
+			ID:     "2026-03-24T12-00-00",
+			Status: "running",
 		})
 	}))
 	defer srv.Close()
@@ -545,14 +545,11 @@ func TestClient_DownloadToServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Status != "completed" {
-		t.Errorf("status = %q, want %q", result.Status, "completed")
+	if result.Status != "running" {
+		t.Errorf("status = %q, want %q", result.Status, "running")
 	}
-	if result.FilesCount != 42 {
-		t.Errorf("files_count = %d, want %d", result.FilesCount, 42)
-	}
-	if result.TotalBytes != 1048576 {
-		t.Errorf("total_bytes = %d, want %d", result.TotalBytes, 1048576)
+	if result.ID != "2026-03-24T12-00-00" {
+		t.Errorf("id = %q, want %q", result.ID, "2026-03-24T12-00-00")
 	}
 }
 
