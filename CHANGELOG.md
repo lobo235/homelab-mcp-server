@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.4.1] - 2026-03-24
+
+### Added
+- `move_server_file` and `delete_server_file` MCP tools for file management on server filesystem
+- RCON command blocklist: `stop`, `save-off`, `ban-ip` blocked at MCP level with clear error messages
+
 ## [v1.4.0] - 2026-03-24
 
 ### Added

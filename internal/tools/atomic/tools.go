@@ -504,10 +504,29 @@ func deleteServerDirectory(d *Deps) server.ServerTool {
 	}
 }
 
+// blockedRCONCommands are RCON commands that must not be executed via the chatbot.
+// These are either destructive with no undo, or duplicate existing tools.
+var blockedRCONCommands = []string{
+	"stop",     // Use stop_nomad_job instead — proper orchestration with DNS cleanup
+	"save-off", // Too easy to forget save-on, causes silent data loss
+	"ban-ip",   // IP bans are hard to undo and can affect shared IPs
+}
+
+// isBlockedRCONCommand checks if the command starts with a blocked keyword.
+func isBlockedRCONCommand(command string) (string, bool) {
+	cmd := strings.ToLower(strings.TrimSpace(command))
+	for _, blocked := range blockedRCONCommands {
+		if cmd == blocked || strings.HasPrefix(cmd, blocked+" ") {
+			return blocked, true
+		}
+	}
+	return "", false
+}
+
 func executeRCONCommand(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("execute_rcon_command",
-			mcp.WithDescription("Send an RCON command to a Minecraft server"),
+			mcp.WithDescription("Send an RCON command to a Minecraft server. Some commands are blocked for safety: 'stop' (use stop_nomad_job instead), 'save-off' (risk of data loss), 'ban-ip' (hard to undo). For destructive commands like ban, op, deop, kick, gamerule, fill, setblock, kill — always confirm with the user before executing."),
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 			mcp.WithString("command", mcp.Required(), mcp.Description("RCON command to execute")),
 		),
@@ -520,6 +539,12 @@ func executeRCONCommand(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
+
+			// Block dangerous commands.
+			if blocked, ok := isBlockedRCONCommand(command); ok {
+				return mcp.NewToolResultError(fmt.Sprintf("RCON command %q is blocked for safety. Use the appropriate MCP tool instead (e.g., stop_nomad_job for stopping servers).", blocked)), nil
+			}
+
 			// RCON uses the full job ID (mc-atm10) — the minecraft-gateway needs it
 			// for Nomad allocation lookup. Don't strip the mc- prefix here.
 			response, err := d.Minecraft.ExecuteRCON(ctx, name, command)
