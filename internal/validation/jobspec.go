@@ -31,6 +31,14 @@ func ValidateServerName(name string) error {
 	return nil
 }
 
+// MCServerDir returns the NFS directory name for a Minecraft server job.
+// Convention: job IDs are prefixed with "mc-" but filesystem and DNS use the
+// bare name. For example, job "mc-atm9" uses directory "atm9" and hostname
+// "atm9.<domain>".
+func MCServerDir(jobID string) string {
+	return strings.TrimPrefix(jobID, "mc-")
+}
+
 // ValidateAllocID checks if an allocation ID is a valid UUID.
 func ValidateAllocID(id string) error {
 	if !allocIDPattern.MatchString(id) {

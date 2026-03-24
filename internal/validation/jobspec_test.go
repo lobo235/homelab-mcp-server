@@ -405,6 +405,29 @@ job "test-job" {
 	}
 }
 
+func TestMCServerDir(t *testing.T) {
+	tests := []struct {
+		jobID string
+		want  string
+	}{
+		{"mc-atm9", "atm9"},
+		{"mc-vanilla1", "vanilla1"},
+		{"mc-atm10-kids", "atm10-kids"},
+		{"nomad-job", "nomad-job"}, // no mc- prefix, unchanged
+		{"minecraft", "minecraft"}, // no prefix
+		{"mc-a", "a"},              // minimal
+		{"mc-", ""},                // edge case: just "mc-"
+	}
+	for _, tt := range tests {
+		t.Run(tt.jobID, func(t *testing.T) {
+			got := MCServerDir(tt.jobID)
+			if got != tt.want {
+				t.Errorf("MCServerDir(%q) = %q, want %q", tt.jobID, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestValidateJobName(t *testing.T) {
 	tests := []struct {
 		name  string

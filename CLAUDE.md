@@ -195,6 +195,19 @@ Key patterns:
 - Table-driven tests for input validation
 - Both success and error paths tested
 
+## Naming Convention — Minecraft Servers
+
+Minecraft server names follow a split naming convention:
+
+| Concern | Convention | Example |
+|---------|-----------|---------|
+| Nomad job ID | `mc-{name}` | `mc-atm9` |
+| Vault secret path | `mc-{name}` | `kv/nomad/default/mc-atm9` |
+| NFS directory | `{name}` | `/minecraft/atm9/` |
+| DNS hostname | `{name}.{domain}` | `atm9.example.com` |
+
+All tool layers use `validation.MCServerDir(jobID)` to strip the `mc-` prefix before passing names to minecraft-gateway (NFS, RCON, backups) or constructing DNS hostnames. Nomad and Vault operations use the full job ID.
+
 ## Coding Conventions
 
 - Uses `github.com/mark3labs/mcp-go` v0.45.0 with **stdio transport only** (HTTP/SSE has race condition)

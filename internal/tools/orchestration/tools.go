@@ -46,10 +46,11 @@ func Register(s *server.MCPServer, d *Deps) {
 // rollbackProvision reverses completed provisioning steps in reverse order.
 func (d *Deps) rollbackProvision(ctx context.Context, name string, steps []string) {
 	d.Log.Warn("rolling back provision", "server", name, "completed_steps", steps)
+	dirName := validation.MCServerDir(name)
 	for i := len(steps) - 1; i >= 0; i-- {
 		switch steps[i] {
 		case "dns":
-			hostname := name + "." + d.MCPublicDomain
+			hostname := dirName + "." + d.MCPublicDomain
 			if err := d.Cloudflare.DeleteRecordByZoneName(ctx, d.CFZoneName, hostname); err != nil {
 				d.Log.Error("rollback: delete DNS failed", "error", err)
 			}
@@ -85,9 +86,11 @@ func (d *Deps) waitForHealth(ctx context.Context, jobID string, maxAttempts int,
 
 // executeProvision runs the 6-step Minecraft server provisioning workflow.
 // Order: DNS first (maximize propagation time), then secret, directory, job spec, submit, health.
+// Convention: job name is "mc-{name}" but DNS and NFS use bare "{name}".
 func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[string]any, error) {
 	var steps []string
-	hostname := name + "." + d.MCPublicDomain
+	dirName := validation.MCServerDir(name)
+	hostname := dirName + "." + d.MCPublicDomain
 
 	// Step 1: Create Cloudflare DNS CNAME (first to maximize propagation time).
 	d.Log.Info("provision: create DNS", "server", name, "hostname", hostname)
@@ -100,7 +103,7 @@ func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[stri
 	}
 	steps = append(steps, "dns")
 
-	// Step 2: Create Vault secret (RCON password).
+	// Step 2: Create Vault secret (RCON password) — uses job name (mc-{name}).
 	d.Log.Info("provision: create secret", "server", name)
 	if err := d.Vault.CreateSecret(ctx, name); err != nil {
 		d.rollbackProvision(ctx, name, steps)
@@ -108,9 +111,9 @@ func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[stri
 	}
 	steps = append(steps, "secret")
 
-	// Step 3: Init NFS server directory.
-	d.Log.Info("provision: init directory", "server", name)
-	if err := d.Minecraft.InitServer(ctx, name, 1000, 1000); err != nil {
+	// Step 3: Init NFS server directory — uses bare name without mc- prefix.
+	d.Log.Info("provision: init directory", "server", name, "dir", dirName)
+	if err := d.Minecraft.InitServer(ctx, dirName, 1000, 1000); err != nil {
 		d.rollbackProvision(ctx, name, steps)
 		return nil, fmt.Errorf("step 3/5 init directory failed: %w", err)
 	}
@@ -186,6 +189,7 @@ func destroyMinecraftServer(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			deleteDir := req.GetBool("delete_directory", false)
+			dirName := validation.MCServerDir(name)
 
 			var errors []string
 
@@ -195,7 +199,7 @@ func destroyMinecraftServer(d *Deps) server.ServerTool {
 				errors = append(errors, fmt.Sprintf("stop job: %s", err.Error()))
 			}
 
-			hostname := name + "." + d.MCPublicDomain
+			hostname := dirName + "." + d.MCPublicDomain
 			d.Log.Info("destroy: delete DNS", "server", name, "hostname", hostname)
 			if err := d.Cloudflare.DeleteRecordByZoneName(ctx, d.CFZoneName, hostname); err != nil {
 				d.Log.Error("destroy: delete DNS failed", "error", err)
@@ -209,8 +213,8 @@ func destroyMinecraftServer(d *Deps) server.ServerTool {
 			}
 
 			if deleteDir {
-				d.Log.Info("destroy: delete directory", "server", name)
-				if err := d.Minecraft.DeleteServer(ctx, name); err != nil {
+				d.Log.Info("destroy: delete directory", "server", name, "dir", dirName)
+				if err := d.Minecraft.DeleteServer(ctx, dirName); err != nil {
 					d.Log.Error("destroy: delete directory failed", "error", err)
 					errors = append(errors, fmt.Sprintf("delete directory: %s", err.Error()))
 				}

@@ -31,6 +31,9 @@ func requireServerName(req mcp.CallToolRequest, param string) (string, error) {
 	return name, nil
 }
 
+// mcDir resolves the NFS directory name from a Nomad job ID (strips mc- prefix).
+func mcDir(jobID string) string { return validation.MCServerDir(jobID) }
+
 // requireJobID extracts and validates a job ID from the request.
 func requireJobID(req mcp.CallToolRequest, param string) (string, error) {
 	id, err := req.RequireString(param)
@@ -448,10 +451,11 @@ func initServerDirectory(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			if err := d.Minecraft.InitServer(ctx, name, 1000, 1000); err != nil {
+			dirName := mcDir(name)
+			if err := d.Minecraft.InitServer(ctx, dirName, 1000, 1000); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			return mcp.NewToolResultText(fmt.Sprintf("Server directory initialized for %q", name)), nil
+			return mcp.NewToolResultText(fmt.Sprintf("Server directory initialized for %q (dir: %s)", name, dirName)), nil
 		},
 	}
 }
@@ -467,10 +471,11 @@ func deleteServerDirectory(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			if err := d.Minecraft.DeleteServer(ctx, name); err != nil {
+			dirName := mcDir(name)
+			if err := d.Minecraft.DeleteServer(ctx, dirName); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			return mcp.NewToolResultText(fmt.Sprintf("Server directory deleted for %q", name)), nil
+			return mcp.NewToolResultText(fmt.Sprintf("Server directory deleted for %q (dir: %s)", name, dirName)), nil
 		},
 	}
 }
@@ -491,7 +496,7 @@ func executeRCONCommand(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			response, err := d.Minecraft.ExecuteRCON(ctx, name, command)
+			response, err := d.Minecraft.ExecuteRCON(ctx, mcDir(name), command)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -511,7 +516,7 @@ func listBackups(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			backups, err := d.Minecraft.ListBackups(ctx, name)
+			backups, err := d.Minecraft.ListBackups(ctx, mcDir(name))
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -531,7 +536,7 @@ func createBackup(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			backup, err := d.Minecraft.CreateBackup(ctx, name)
+			backup, err := d.Minecraft.CreateBackup(ctx, mcDir(name))
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}

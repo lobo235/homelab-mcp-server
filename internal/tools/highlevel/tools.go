@@ -15,6 +15,9 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/validation"
 )
 
+// mcDir resolves the NFS directory name from a Nomad job ID (strips mc- prefix).
+func mcDir(jobID string) string { return validation.MCServerDir(jobID) }
+
 // playerNamePattern validates Minecraft usernames.
 var playerNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_]{1,16}$`)
 
@@ -149,9 +152,10 @@ func upgradeMinecraftServer(d *Deps) server.ServerTool {
 			}
 			newVersion := req.GetString("new_version", "")
 
-			// Step 1: Create a backup before upgrade.
-			d.Log.Info("upgrade: creating backup", "server", name)
-			backup, backupErr := d.Minecraft.CreateBackup(ctx, name)
+			// Step 1: Create a backup before upgrade (uses bare dir name).
+			dirName := mcDir(name)
+			d.Log.Info("upgrade: creating backup", "server", name, "dir", dirName)
+			backup, backupErr := d.Minecraft.CreateBackup(ctx, dirName)
 
 			// Step 2: Fetch current job spec.
 			spec, specErr := d.Nomad.GetJobSpec(ctx, name)
@@ -238,7 +242,7 @@ func sendRCONCommand(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			response, err := d.Minecraft.ExecuteRCON(ctx, name, command)
+			response, err := d.Minecraft.ExecuteRCON(ctx, mcDir(name), command)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -270,7 +274,7 @@ func opPlayer(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(fmt.Sprintf("invalid player name %q: must match [a-zA-Z0-9_]{1,16}", player)), nil
 			}
 
-			response, err := d.Minecraft.ExecuteRCON(ctx, name, "op "+player)
+			response, err := d.Minecraft.ExecuteRCON(ctx, mcDir(name), "op "+player)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -302,7 +306,7 @@ func deopPlayer(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(fmt.Sprintf("invalid player name %q: must match [a-zA-Z0-9_]{1,16}", player)), nil
 			}
 
-			response, err := d.Minecraft.ExecuteRCON(ctx, name, "deop "+player)
+			response, err := d.Minecraft.ExecuteRCON(ctx, mcDir(name), "deop "+player)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -326,7 +330,7 @@ func backupServer(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			backup, err := d.Minecraft.CreateBackup(ctx, name)
+			backup, err := d.Minecraft.CreateBackup(ctx, mcDir(name))
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("backup failed: %s", err.Error())), nil
 			}

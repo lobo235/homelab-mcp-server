@@ -43,7 +43,6 @@ type HealthStatus struct {
 	Status  string `json:"status"`
 }
 
-
 // SubmitRequest represents a job submission request.
 type SubmitRequest struct {
 	HCL string `json:"hcl"`
