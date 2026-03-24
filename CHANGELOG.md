@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.3.2] - 2026-03-24
+
+### Fixed
+- `get_minecraft_server_status` no longer calls the blocking `watch_job_health` endpoint (up to 5-min timeout) — derives health from allocation ClientStatus instead, preventing connection timeouts when checking unhealthy servers
+
 ## [v1.3.1] - 2026-03-24
 
 ### Added

@@ -198,16 +198,21 @@ func getMinecraftServerStatus(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(fmt.Sprintf("get allocations failed: %s", err.Error())), nil
 			}
 
-			health, _ := d.Nomad.GetJobHealth(ctx, name)
+			// Derive health from allocation status — don't call the blocking
+			// watch_job_health endpoint which can wait up to 5 minutes.
+			healthy := false
+			for _, a := range allocs {
+				if a.ClientStatus == "running" {
+					healthy = true
+					break
+				}
+			}
 
 			result := map[string]any{
 				"name":        name,
 				"job_status":  job.Status,
+				"healthy":     healthy,
 				"allocations": allocs,
-			}
-			if health != nil {
-				result["healthy"] = health.Healthy
-				result["health_status"] = health.Status
 			}
 			return mcp.NewToolResultJSON(result)
 		},
