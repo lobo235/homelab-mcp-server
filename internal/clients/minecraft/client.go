@@ -4,6 +4,7 @@ package minecraft
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/lobo235/homelab-mcp-server/internal/clients"
 )
@@ -108,7 +109,7 @@ func (c *Client) ListFiles(ctx context.Context, name, subPath string) ([]FileEnt
 	}
 	path := "/servers/" + name + "/files"
 	if subPath != "" {
-		path += "?path=" + subPath
+		path += "?path=" + url.QueryEscape(subPath)
 	}
 	if err := c.base.DoJSON(ctx, "GET", path, nil, &envelope); err != nil {
 		return nil, fmt.Errorf("list files for %q: %w", name, err)
@@ -121,7 +122,7 @@ func (c *Client) ReadFile(ctx context.Context, name, filePath string) (string, e
 	var envelope struct {
 		Content string `json:"content"`
 	}
-	path := "/servers/" + name + "/files/read?path=" + filePath
+	path := "/servers/" + name + "/files/read?path=" + url.QueryEscape(filePath)
 	if err := c.base.DoJSON(ctx, "GET", path, nil, &envelope); err != nil {
 		return "", fmt.Errorf("read file for %q: %w", name, err)
 	}

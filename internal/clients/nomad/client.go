@@ -4,6 +4,7 @@ package nomad
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/lobo235/homelab-mcp-server/internal/clients"
 )
@@ -159,7 +160,7 @@ func (c *Client) GetAllocationLogs(ctx context.Context, jobID, allocID, task, lo
 	if logType == "" {
 		logType = "stdout"
 	}
-	path := fmt.Sprintf("/jobs/%s/allocations/%s/logs?task=%s&type=%s", jobID, allocID, task, logType)
+	path := fmt.Sprintf("/jobs/%s/allocations/%s/logs?task=%s&type=%s", jobID, allocID, url.QueryEscape(task), url.QueryEscape(logType))
 	text, err := c.base.DoText(ctx, "GET", path, nil)
 	if err != nil {
 		return "", fmt.Errorf("get allocation logs %q: %w", allocID, err)

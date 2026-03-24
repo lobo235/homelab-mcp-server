@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.2.4] - 2026-03-24
+
+### Fixed
+- URL-encode query parameters in `GetAllocationLogs`, `ListFiles`, and `ReadFile` to prevent query parameter injection
+
 ## [v1.2.3] - 2026-03-24
 
 ### Removed
