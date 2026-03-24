@@ -167,6 +167,85 @@ func (c *Client) Restore(ctx context.Context, name string, body any) error {
 	return nil
 }
 
+// DownloadRequest represents a file download request.
+type DownloadRequest struct {
+	URL      string `json:"url"`
+	DestPath string `json:"dest_path"`
+	Extract  bool   `json:"extract"`
+	Mode     string `json:"mode"`
+	UID      int    `json:"uid"`
+	GID      int    `json:"gid"`
+}
+
+// DownloadResult represents the outcome of a file download.
+type DownloadResult struct {
+	Status     string `json:"status"`
+	FilesCount int    `json:"files_count"`
+	TotalBytes int64  `json:"total_bytes"`
+}
+
+// DownloadToServer downloads a file to a server directory.
+func (c *Client) DownloadToServer(ctx context.Context, name string, req DownloadRequest) (*DownloadResult, error) {
+	var result DownloadResult
+	if err := c.base.DoJSON(ctx, "POST", "/servers/"+name+"/download", req, &result); err != nil {
+		return nil, fmt.Errorf("download to %q: %w", name, err)
+	}
+	return &result, nil
+}
+
+// ArchiveEntry represents a file inside an archive on the server filesystem.
+type ArchiveEntry struct {
+	Name  string `json:"name"`
+	Size  int64  `json:"size"`
+	IsDir bool   `json:"is_dir"`
+}
+
+// ListArchiveContents lists files inside an archive on the server filesystem.
+func (c *Client) ListArchiveContents(ctx context.Context, name, path string) ([]ArchiveEntry, error) {
+	var envelope struct {
+		Entries []ArchiveEntry `json:"entries"`
+	}
+	endpoint := "/servers/" + name + "/archive?path=" + url.QueryEscape(path)
+	if err := c.base.DoJSON(ctx, "GET", endpoint, nil, &envelope); err != nil {
+		return nil, fmt.Errorf("list archive contents for %q: %w", name, err)
+	}
+	return envelope.Entries, nil
+}
+
+// writeFileRequest is the JSON body for PUT /servers/{name}/files/write.
+type writeFileRequest struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	UID     int    `json:"uid"`
+	GID     int    `json:"gid"`
+}
+
+// WriteFile writes content to a file on the server filesystem.
+func (c *Client) WriteFile(ctx context.Context, name, path, content string, uid, gid int) error {
+	body := writeFileRequest{Path: path, Content: content, UID: uid, GID: gid}
+	if err := c.base.DoNoContent(ctx, "PUT", "/servers/"+name+"/files/write", body); err != nil {
+		return fmt.Errorf("write file for %q: %w", name, err)
+	}
+	return nil
+}
+
+// MoveFile moves/renames a file or directory within a server's filesystem.
+func (c *Client) MoveFile(ctx context.Context, name, srcPath, dstPath string) error {
+	body := map[string]string{"src_path": srcPath, "dst_path": dstPath}
+	if err := c.base.DoNoContent(ctx, "POST", "/servers/"+name+"/files/move", body); err != nil {
+		return fmt.Errorf("move file for %q: %w", name, err)
+	}
+	return nil
+}
+
+// DeleteFile removes a file or directory from a server's filesystem.
+func (c *Client) DeleteFile(ctx context.Context, name, path string) error {
+	if err := c.base.DoNoContent(ctx, "DELETE", "/servers/"+name+"/files/delete?path="+url.QueryEscape(path), nil); err != nil {
+		return fmt.Errorf("delete file for %q: %w", name, err)
+	}
+	return nil
+}
+
 // ExecuteRCON sends an RCON command to a server.
 func (c *Client) ExecuteRCON(ctx context.Context, name, command string) (string, error) {
 	req := RCONRequest{Command: command}

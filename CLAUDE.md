@@ -156,6 +156,13 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `execute_rcon_command` | minecraft | Send RCON command to server |
 | `list_backups` | minecraft | List server backups |
 | `create_backup` | minecraft | Create server backup |
+| `download_to_server` | minecraft | Download file (modpack, mod, config) to server directory |
+| `list_archive_contents` | minecraft | List files inside a zip/tar archive on server |
+| `list_server_files` | minecraft | List files and directories on server filesystem |
+| `read_server_file` | minecraft | Read a file from server filesystem |
+| `write_server_file` | minecraft | Write content to a file on server filesystem |
+| `move_server_file` | minecraft | Move or rename a file/directory on server filesystem |
+| `delete_server_file` | minecraft | Delete a file or directory from server filesystem |
 | `fetch_artifact` | — | Fetch trusted artifact content (scripts, configs) by URL |
 | `search_modpacks` | curseforge | Search CurseForge for modpacks by name |
 | `search_mods` | curseforge | Search CurseForge for mods by name |

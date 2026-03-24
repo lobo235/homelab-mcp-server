@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.4.0] - 2026-03-24
+
+### Added
+- `download_to_server` MCP tool — download modpacks, mods, and configs from CurseForge/Modrinth/FTB to server filesystem
+- `list_archive_contents` MCP tool — inspect zip/tar archives on server filesystem before extraction
+- `list_server_files` MCP tool — browse server directory structure
+- `read_server_file` MCP tool — read config files and logs from server filesystem
+- `write_server_file` MCP tool — write config files to server filesystem
+- `fetch_artifact` MCP tool — fetch trusted scripts from allowlisted GitHub URLs
+- `search_mods` MCP tool — search CurseForge for mods by name
+- Log grep parameter on `get_job_logs` for server-side log filtering
+
 ## [v1.3.3] - 2026-03-24
 
 ### Added
