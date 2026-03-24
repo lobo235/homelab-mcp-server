@@ -242,7 +242,9 @@ func sendRCONCommand(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			response, err := d.Minecraft.ExecuteRCON(ctx, mcDir(name), command)
+			// RCON uses the full job ID — the minecraft-gateway needs it
+			// for Nomad allocation lookup. Don't strip the mc- prefix.
+			response, err := d.Minecraft.ExecuteRCON(ctx, name, command)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -274,7 +276,8 @@ func opPlayer(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(fmt.Sprintf("invalid player name %q: must match [a-zA-Z0-9_]{1,16}", player)), nil
 			}
 
-			response, err := d.Minecraft.ExecuteRCON(ctx, mcDir(name), "op "+player)
+			// RCON uses the full job ID for Nomad allocation lookup.
+			response, err := d.Minecraft.ExecuteRCON(ctx, name, "op "+player)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -306,7 +309,8 @@ func deopPlayer(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(fmt.Sprintf("invalid player name %q: must match [a-zA-Z0-9_]{1,16}", player)), nil
 			}
 
-			response, err := d.Minecraft.ExecuteRCON(ctx, mcDir(name), "deop "+player)
+			// RCON uses the full job ID for Nomad allocation lookup.
+			response, err := d.Minecraft.ExecuteRCON(ctx, name, "deop "+player)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}

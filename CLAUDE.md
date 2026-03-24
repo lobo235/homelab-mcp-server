@@ -203,10 +203,12 @@ Minecraft server names follow a split naming convention:
 |---------|-----------|---------|
 | Nomad job ID | `mc-{name}` | `mc-atm9` |
 | Vault secret path | `mc-{name}` | `kv/nomad/default/mc-atm9` |
+| RCON (via minecraft-gateway) | `mc-{name}` | `mc-atm9` (gateway looks up Nomad allocations) |
 | NFS directory | `{name}` | `/minecraft/atm9/` |
 | DNS hostname | `{name}.{domain}` | `atm9.example.com` |
+| Backups (via minecraft-gateway) | `{name}` | `atm9` |
 
-All tool layers use `validation.MCServerDir(jobID)` to strip the `mc-` prefix before passing names to minecraft-gateway (NFS, RCON, backups) or constructing DNS hostnames. Nomad and Vault operations use the full job ID.
+Tool layers use `validation.MCServerDir(jobID)` to strip the `mc-` prefix for NFS, backup, and DNS operations. RCON passes the full job ID because the minecraft-gateway uses it to query Nomad for the allocation's dynamic RCON port.
 
 ## Coding Conventions
 

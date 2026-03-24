@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.2.1] - 2026-03-24
+
 ### Added
 - `MCServerDir()` naming convention helper: Nomad jobs use `mc-` prefix, NFS directories and DNS hostnames use bare name (e.g., job `mc-atm9` → dir `atm9`, hostname `atm9.<domain>`)
 
 ### Fixed
-- All minecraft-gateway calls now strip `mc-` prefix from job IDs before passing to NFS/RCON/backup operations — fixes 404 errors caused by directory name mismatch
-- DNS hostname construction in provision/destroy uses bare name instead of job ID
+- Allocation struct JSON tags changed from snake_case to PascalCase to match nomad-gateway's Nomad API native format — fixes empty allocation fields in `get_job_status` and `get_minecraft_server_status`
+- RCON tools (`execute_rcon_command`, `send_rcon_command`, `op_player`, `deop_player`) now pass full job ID to minecraft-gateway instead of stripping `mc-` prefix — fixes 404 errors for RCON operations
+- NFS/DNS/backup operations correctly strip `mc-` prefix from job IDs
 - Pre-existing goimports formatting issues in curseforge and nomad clients
 
 ## [v1.1.0] - 2026-03-23

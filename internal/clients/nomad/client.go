@@ -27,13 +27,14 @@ type JobDetail struct {
 }
 
 // Allocation represents a Nomad allocation.
+// Field names match nomad-gateway's PascalCase JSON output (Nomad API native format).
 type Allocation struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	TaskGroup     string `json:"task_group"`
-	ClientStatus  string `json:"client_status"`
-	DesiredStatus string `json:"desired_status"`
-	NodeID        string `json:"node_id"`
+	ID            string `json:"ID"`
+	Name          string `json:"Name"`
+	TaskGroup     string `json:"TaskGroup"`
+	ClientStatus  string `json:"ClientStatus"`
+	DesiredStatus string `json:"DesiredStatus"`
+	NodeID        string `json:"NodeID"`
 }
 
 // HealthStatus represents job health information.

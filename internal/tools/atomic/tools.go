@@ -496,7 +496,9 @@ func executeRCONCommand(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			response, err := d.Minecraft.ExecuteRCON(ctx, mcDir(name), command)
+			// RCON uses the full job ID (mc-atm10) — the minecraft-gateway needs it
+			// for Nomad allocation lookup. Don't strip the mc- prefix here.
+			response, err := d.Minecraft.ExecuteRCON(ctx, name, command)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
