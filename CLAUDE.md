@@ -179,9 +179,6 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `destroy_minecraft_server_by_name` | Destroy by server name |
 | `upgrade_minecraft_server` | Backup -> update spec -> resubmit |
 | `get_minecraft_server_status` | Aggregate job state + allocation health |
-| `send_rcon_command` | Look up RCON endpoint, execute command |
-| `op_player` / `deop_player` | Wrapper around RCON op/deop |
-| `backup_server` | Create backup, poll for completion |
 | `deploy_generic_workload` | Generate HCL from description, provision |
 
 ## Testing Approach

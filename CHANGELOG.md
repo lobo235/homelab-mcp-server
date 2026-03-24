@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.2.3] - 2026-03-24
+
+### Removed
+- `send_rcon_command` highlevel tool (duplicate of atomic `execute_rcon_command`)
+- `op_player` / `deop_player` highlevel tools (duplicate of atomic `execute_rcon_command` with op/deop commands)
+- `backup_server` highlevel tool (duplicate of atomic `create_backup`)
+
 ## [v1.2.2] - 2026-03-24
 
 ### Fixed
