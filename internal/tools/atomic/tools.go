@@ -171,8 +171,8 @@ func getJobSpec(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			// Update spec cache with latest HCL.
-			if d.SpecCache != nil {
+			// Update spec cache with latest HCL (only if non-empty to avoid clobbering).
+			if d.SpecCache != nil && spec != "" {
 				_ = d.SpecCache.Write(jobID, spec)
 			}
 			return mcp.NewToolResultText(spec), nil
