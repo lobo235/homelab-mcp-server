@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.3.0] - 2026-03-24
+
+### Added
+- `search_modpacks` MCP tool — search CurseForge for modpacks by name instead of requiring project IDs
+
 ## [v1.2.4] - 2026-03-24
 
 ### Fixed

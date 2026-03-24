@@ -4,6 +4,7 @@ package curseforge
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/lobo235/homelab-mcp-server/internal/clients"
 )
@@ -109,4 +110,33 @@ func (c *Client) GetModFile(ctx context.Context, projectID, fileID string) (*Mod
 		return nil, fmt.Errorf("get mod file %s/%s: %w", projectID, fileID, err)
 	}
 	return &file, nil
+}
+
+// SearchResult represents a CurseForge search result.
+type SearchResult struct {
+	ID           int      `json:"id"`
+	Name         string   `json:"name"`
+	Summary      string   `json:"summary"`
+	ClassID      int      `json:"classId"`
+	GameVersions []string `json:"gameVersions,omitempty"`
+}
+
+// SearchModpacks searches for modpacks by name.
+func (c *Client) SearchModpacks(ctx context.Context, query string) ([]SearchResult, error) {
+	var results []SearchResult
+	path := "/search?type=modpack&query=" + url.QueryEscape(query)
+	if err := c.base.DoJSON(ctx, "GET", path, nil, &results); err != nil {
+		return nil, fmt.Errorf("search modpacks %q: %w", query, err)
+	}
+	return results, nil
+}
+
+// SearchMods searches for mods by name.
+func (c *Client) SearchMods(ctx context.Context, query string) ([]SearchResult, error) {
+	var results []SearchResult
+	path := "/search?type=mod&query=" + url.QueryEscape(query)
+	if err := c.base.DoJSON(ctx, "GET", path, nil, &results); err != nil {
+		return nil, fmt.Errorf("search mods %q: %w", query, err)
+	}
+	return results, nil
 }
