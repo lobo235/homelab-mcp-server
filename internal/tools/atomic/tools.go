@@ -865,6 +865,15 @@ func fetchArtifact(d *Deps) server.ServerTool {
 				fetchURL = "https://" + stripped
 			}
 
+			// Add cache-busting param to bypass GitHub CDN caching of stale content.
+			if strings.Contains(fetchURL, "raw.githubusercontent.com") {
+				sep := "?"
+				if strings.Contains(fetchURL, "?") {
+					sep = "&"
+				}
+				fetchURL += sep + "t=" + fmt.Sprintf("%d", time.Now().Unix())
+			}
+
 			client := &http.Client{Timeout: 15 * time.Second}
 			resp, err := client.Get(fetchURL)
 			if err != nil {
