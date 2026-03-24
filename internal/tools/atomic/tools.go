@@ -20,6 +20,8 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/vault"
+	"github.com/lobo235/homelab-mcp-server/internal/itzgcache"
+	"github.com/lobo235/homelab-mcp-server/internal/speccache"
 	"github.com/lobo235/homelab-mcp-server/internal/validation"
 )
 
@@ -70,6 +72,8 @@ type Deps struct {
 	Minecraft  *minecraft.Client
 	Curseforge *curseforge.Client
 	Vault      *vault.Client
+	ItzgDocs   *itzgcache.Cache
+	SpecCache  *speccache.Cache
 	Log        *slog.Logger
 
 	CFZoneName        string
@@ -130,6 +134,10 @@ func Register(s *server.MCPServer, d *Deps) {
 		getModpackFile(d),
 		validateMod(d),
 		getModFile(d),
+
+		// itzg documentation tools
+		searchItzgDocs(d),
+		getItzgDoc(d),
 	)
 }
 
@@ -162,6 +170,10 @@ func getJobSpec(d *Deps) server.ServerTool {
 			spec, err := d.Nomad.GetJobSpec(ctx, jobID)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
+			}
+			// Update spec cache with latest HCL.
+			if d.SpecCache != nil {
+				_ = d.SpecCache.Write(jobID, spec)
 			}
 			return mcp.NewToolResultText(spec), nil
 		},
@@ -254,6 +266,10 @@ func submitNomadJob(d *Deps) server.ServerTool {
 			resp, err := d.Nomad.SubmitJob(ctx, hcl)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
+			}
+			// Update spec cache with the submitted HCL.
+			if d.SpecCache != nil && resp.JobID != "" {
+				_ = d.SpecCache.Write(resp.JobID, hcl)
 			}
 			return mcp.NewToolResultJSON(resp)
 		},

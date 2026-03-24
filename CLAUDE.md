@@ -164,6 +164,8 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `move_server_file` | minecraft | Move or rename a file/directory on server filesystem |
 | `delete_server_file` | minecraft | Delete a file or directory from server filesystem |
 | `fetch_artifact` | — | Fetch trusted artifact content (scripts, configs) by URL |
+| `search_itzg_docs` | — | Search itzg/docker-minecraft-server documentation for a keyword |
+| `get_itzg_doc` | — | Read a specific itzg/docker-minecraft-server documentation page |
 | `search_modpacks` | curseforge | Search CurseForge for modpacks by name |
 | `search_mods` | curseforge | Search CurseForge for mods by name |
 | `validate_modpack` | curseforge | Validate a CurseForge modpack |

@@ -124,6 +124,8 @@ func main() {
 		Minecraft:         mcClient,
 		Curseforge:        curseforgeClient,
 		Vault:             vaultClient,
+		ItzgDocs:          itzgCache,
+		SpecCache:         specCache,
 		Log:               log,
 		CFZoneName:        cfg.CFZoneName,
 		ArtifactAllowlist: cfg.ArtifactAllowlist,
