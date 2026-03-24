@@ -107,6 +107,7 @@ func Register(s *server.MCPServer, d *Deps) {
 
 		// CurseForge tools
 		searchModpacks(d),
+		searchMods(d),
 		validateModpack(d),
 		getModpackFiles(d),
 		getModpackFile(d),
@@ -560,6 +561,26 @@ func searchModpacks(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			results, err := d.Curseforge.SearchModpacks(ctx, query)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultJSON(results)
+		},
+	}
+}
+
+func searchMods(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("search_mods",
+			mcp.WithDescription("Search CurseForge for mods by name. Use this to find mod project IDs when you don't know them. Returns up to 10 results sorted by popularity."),
+			mcp.WithString("query", mcp.Required(), mcp.Description("Search query (e.g., 'JEI', 'Create', 'Mekanism')")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			query, err := req.RequireString("query")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			results, err := d.Curseforge.SearchMods(ctx, query)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
