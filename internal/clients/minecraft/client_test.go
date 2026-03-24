@@ -494,6 +494,198 @@ func TestClient_Restore_Error(t *testing.T) {
 	}
 }
 
+func TestClient_DownloadToServer(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/servers/atm10/download" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var req DownloadRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		if req.URL != "https://example.com/serverpack.zip" {
+			t.Errorf("url = %q, want %q", req.URL, "https://example.com/serverpack.zip")
+		}
+		if req.DestPath != "." {
+			t.Errorf("dest_path = %q, want %q", req.DestPath, ".")
+		}
+		if !req.Extract {
+			t.Error("expected extract=true")
+		}
+		if req.Mode != "overwrite" {
+			t.Errorf("mode = %q, want %q", req.Mode, "overwrite")
+		}
+		if req.UID != 1001 {
+			t.Errorf("uid = %d, want %d", req.UID, 1001)
+		}
+		if req.GID != 1001 {
+			t.Errorf("gid = %d, want %d", req.GID, 1001)
+		}
+		json.NewEncoder(w).Encode(DownloadResult{
+			Status:     "completed",
+			FilesCount: 42,
+			TotalBytes: 1048576,
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	result, err := client.DownloadToServer(context.Background(), "atm10", DownloadRequest{
+		URL:      "https://example.com/serverpack.zip",
+		DestPath: ".",
+		Extract:  true,
+		Mode:     "overwrite",
+		UID:      1001,
+		GID:      1001,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Status != "completed" {
+		t.Errorf("status = %q, want %q", result.Status, "completed")
+	}
+	if result.FilesCount != 42 {
+		t.Errorf("files_count = %d, want %d", result.FilesCount, 42)
+	}
+	if result.TotalBytes != 1048576 {
+		t.Errorf("total_bytes = %d, want %d", result.TotalBytes, 1048576)
+	}
+}
+
+func TestClient_DownloadToServer_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"code":    "bad_request",
+			"message": "invalid URL",
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.DownloadToServer(context.Background(), "atm10", DownloadRequest{
+		URL: "invalid",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestClient_ListArchiveContents(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/servers/atm10/archive" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		pathParam := r.URL.Query().Get("path")
+		if pathParam != "serverpack.zip" {
+			t.Errorf("path param = %q, want %q", pathParam, "serverpack.zip")
+		}
+		json.NewEncoder(w).Encode(map[string][]ArchiveEntry{
+			"entries": {
+				{Name: "server.properties", Size: 1024, IsDir: false},
+				{Name: "mods/", Size: 0, IsDir: true},
+				{Name: "mods/jei.jar", Size: 524288, IsDir: false},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	entries, err := client.ListArchiveContents(context.Background(), "atm10", "serverpack.zip")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 3 {
+		t.Fatalf("len = %d, want 3", len(entries))
+	}
+	if entries[0].Name != "server.properties" {
+		t.Errorf("entries[0].Name = %q, want %q", entries[0].Name, "server.properties")
+	}
+	if entries[1].IsDir != true {
+		t.Error("expected entries[1].IsDir = true")
+	}
+}
+
+func TestClient_ListArchiveContents_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"code":    "not_found",
+			"message": "archive not found",
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.ListArchiveContents(context.Background(), "atm10", "nonexistent.zip")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestClient_WriteFile(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "PUT" {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/servers/atm10/files/write" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var req writeFileRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		if req.Path != "server.properties" {
+			t.Errorf("path = %q, want %q", req.Path, "server.properties")
+		}
+		if req.Content != "motd=Test Server\nmax-players=10\n" {
+			t.Errorf("content = %q, unexpected", req.Content)
+		}
+		if req.UID != 1001 {
+			t.Errorf("uid = %d, want %d", req.UID, 1001)
+		}
+		if req.GID != 1001 {
+			t.Errorf("gid = %d, want %d", req.GID, 1001)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	err := client.WriteFile(context.Background(), "atm10", "server.properties", "motd=Test Server\nmax-players=10\n", 1001, 1001)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestClient_WriteFile_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"code":    "internal_error",
+			"message": "write failed",
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	err := client.WriteFile(context.Background(), "atm10", "server.properties", "content", 1001, 1001)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestClient_ExecuteRCON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {

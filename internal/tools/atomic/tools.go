@@ -110,6 +110,13 @@ func Register(s *server.MCPServer, d *Deps) {
 		executeRCONCommand(d),
 		listBackups(d),
 		createBackup(d),
+		downloadToServer(d),
+		listArchiveContents(d),
+		listServerFiles(d),
+		readServerFile(d),
+		writeServerFile(d),
+		moveServerFile(d),
+		deleteServerFile(d),
 
 		// Utility tools
 		fetchArtifact(d),
@@ -560,6 +567,215 @@ func createBackup(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultJSON(backup)
+		},
+	}
+}
+
+func downloadToServer(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("download_to_server",
+			mcp.WithDescription("Download a file from CurseForge, Modrinth, or FTB to a Minecraft server directory. Handles modpack server packs (zip/tar archives), individual mods (.jar files), and config files. Use with extract=true for server pack zips that need to be unpacked into the server root."),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
+			mcp.WithString("url", mcp.Required(), mcp.Description("Download URL (CurseForge, Modrinth, FTB, etc.)")),
+			mcp.WithString("dest_path", mcp.Description("Destination DIRECTORY relative to server root (default: \".\"). The downloaded file keeps its original name from the URL. E.g., \"mods\" puts mod.jar into mods/mod.jar.")),
+			mcp.WithBoolean("extract", mcp.Description("Extract archive after download (default: false)")),
+			mcp.WithString("mode", mcp.Description("Write mode: overwrite, skip_existing, or clean_first (default: overwrite)")),
+			mcp.WithNumber("uid", mcp.Description("File owner UID (default: 1001)")),
+			mcp.WithNumber("gid", mcp.Description("File owner GID (default: 1001)")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			name, err := requireServerName(req, "server_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			rawURL, err := req.RequireString("url")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			destPath := req.GetString("dest_path", ".")
+			extract := req.GetBool("extract", false)
+			mode := req.GetString("mode", "overwrite")
+			uid := req.GetInt("uid", 1001)
+			gid := req.GetInt("gid", 1001)
+
+			dirName := mcDir(name)
+			dlReq := minecraft.DownloadRequest{
+				URL:      rawURL,
+				DestPath: destPath,
+				Extract:  extract,
+				Mode:     mode,
+				UID:      uid,
+				GID:      gid,
+			}
+			result, err := d.Minecraft.DownloadToServer(ctx, dirName, dlReq)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultJSON(result)
+		},
+	}
+}
+
+func listArchiveContents(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("list_archive_contents",
+			mcp.WithDescription("List files inside a zip or tar archive on a Minecraft server's filesystem. Useful for inspecting downloaded server pack archives before extraction."),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
+			mcp.WithString("path", mcp.Required(), mcp.Description("Relative path to the archive within the server directory")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			name, err := requireServerName(req, "server_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			archivePath, err := req.RequireString("path")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			dirName := mcDir(name)
+			entries, err := d.Minecraft.ListArchiveContents(ctx, dirName, archivePath)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultJSON(entries)
+		},
+	}
+}
+
+func listServerFiles(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("list_server_files",
+			mcp.WithDescription("List files and directories in a Minecraft server's filesystem. Use this to explore the server directory structure, find config files, check mod installations, etc."),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name (bare name without mc- prefix, e.g., 'atm10')")),
+			mcp.WithString("path", mcp.Description("Subdirectory path relative to server root (default: root directory). E.g., 'mods', 'config', 'logs'")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			name, err := requireServerName(req, "server_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			subPath := req.GetString("path", "")
+			files, err := d.Minecraft.ListFiles(ctx, name, subPath)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultJSON(files)
+		},
+	}
+}
+
+func readServerFile(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("read_server_file",
+			mcp.WithDescription("Read a file from a Minecraft server's filesystem. Use this to inspect config files (server.properties, ops.json, config/*.toml, etc.)."),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
+			mcp.WithString("path", mcp.Required(), mcp.Description("Relative path to the file within the server directory")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			name, err := requireServerName(req, "server_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			filePath, err := req.RequireString("path")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			dirName := mcDir(name)
+			content, err := d.Minecraft.ReadFile(ctx, dirName, filePath)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(content), nil
+		},
+	}
+}
+
+func writeServerFile(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("write_server_file",
+			mcp.WithDescription("Write content to a file on a Minecraft server's filesystem. Use this for writing config files, scripts, or other text files."),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
+			mcp.WithString("path", mcp.Required(), mcp.Description("Relative path to the file within the server directory")),
+			mcp.WithString("content", mcp.Required(), mcp.Description("File content to write")),
+			mcp.WithNumber("uid", mcp.Description("File owner UID (default: 1001)")),
+			mcp.WithNumber("gid", mcp.Description("File owner GID (default: 1001)")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			name, err := requireServerName(req, "server_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			filePath, err := req.RequireString("path")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			content, err := req.RequireString("content")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			uid := req.GetInt("uid", 1001)
+			gid := req.GetInt("gid", 1001)
+
+			dirName := mcDir(name)
+			if err := d.Minecraft.WriteFile(ctx, dirName, filePath, content, uid, gid); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(fmt.Sprintf("File %q written to server %q", filePath, name)), nil
+		},
+	}
+}
+
+func moveServerFile(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("move_server_file",
+			mcp.WithDescription("Move or rename a file/directory within a Minecraft server's filesystem. Use this to reorganize files, rename configs, or move downloaded files to the right location."),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
+			mcp.WithString("src_path", mcp.Required(), mcp.Description("Source path relative to server root")),
+			mcp.WithString("dst_path", mcp.Required(), mcp.Description("Destination path relative to server root")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			name, err := requireServerName(req, "server_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			srcPath, err := req.RequireString("src_path")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			dstPath, err := req.RequireString("dst_path")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			dirName := mcDir(name)
+			if err := d.Minecraft.MoveFile(ctx, dirName, srcPath, dstPath); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(fmt.Sprintf("Moved %q to %q on server %q", srcPath, dstPath, name)), nil
+		},
+	}
+}
+
+func deleteServerFile(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("delete_server_file",
+			mcp.WithDescription("Delete a file or directory from a Minecraft server's filesystem. Use with caution — this is destructive and cannot be undone. Always confirm with the user before deleting."),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
+			mcp.WithString("path", mcp.Required(), mcp.Description("Path to delete, relative to server root")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			name, err := requireServerName(req, "server_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			filePath, err := req.RequireString("path")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			dirName := mcDir(name)
+			if err := d.Minecraft.DeleteFile(ctx, dirName, filePath); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(fmt.Sprintf("Deleted %q from server %q", filePath, name)), nil
 		},
 	}
 }
