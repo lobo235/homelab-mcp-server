@@ -146,10 +146,25 @@ func listRunningJobs(d *Deps) server.ServerTool {
 		Tool: mcp.NewTool("list_running_jobs",
 			mcp.WithDescription("List all running Nomad jobs"),
 		),
-		Handler: func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			jobs, err := d.Nomad.ListJobs(ctx)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
+			}
+			// Non-admin users only see jobs matching their owned servers.
+			if role != "admin" && role != "" {
+				owned := make(map[string]bool, len(ownedServers))
+				for _, s := range ownedServers {
+					owned[s] = true
+				}
+				filtered := make([]nomad.Job, 0, len(jobs))
+				for _, j := range jobs {
+					if owned[j.ID] {
+						filtered = append(filtered, j)
+					}
+				}
+				jobs = filtered
 			}
 			return mcp.NewToolResultJSON(jobs)
 		},
@@ -163,8 +178,12 @@ func getJobSpec(d *Deps) server.ServerTool {
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireJobAccess(role, jobID, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			spec, err := d.Nomad.GetJobSpec(ctx, jobID)
@@ -187,8 +206,12 @@ func getJobStatus(d *Deps) server.ServerTool {
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireJobAccess(role, jobID, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			job, err := d.Nomad.GetJob(ctx, jobID)
@@ -219,8 +242,12 @@ func getJobLogs(d *Deps) server.ServerTool {
 			mcp.WithString("grep", mcp.Description("Filter pattern — only return log lines containing this text (e.g., 'ERROR', 'WARN', 'client-only'). Use this for large logs instead of fetching everything.")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireJobAccess(role, jobID, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			allocID, err := requireAllocID(req, "alloc_id")
@@ -253,6 +280,8 @@ func submitNomadJob(d *Deps) server.ServerTool {
 			mcp.WithString("hcl", mcp.Required(), mcp.Description("Raw HCL job spec")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			// Extract user context (job ownership checked at orchestration layer).
+			extractUserContext(req)
 			hcl, err := req.RequireString("hcl")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
@@ -283,8 +312,12 @@ func stopNomadJob(d *Deps) server.ServerTool {
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireJobAccess(role, jobID, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := d.Nomad.StopJob(ctx, jobID); err != nil {
@@ -303,8 +336,12 @@ func restartNomadAllocation(d *Deps) server.ServerTool {
 			mcp.WithString("alloc_id", mcp.Required(), mcp.Description("Allocation ID (get this from get_job_status)")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireJobAccess(role, jobID, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			allocID, err := requireAllocID(req, "alloc_id")
@@ -326,8 +363,12 @@ func watchJobHealth(d *Deps) server.ServerTool {
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireJobAccess(role, jobID, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			health, err := d.Nomad.GetJobHealth(ctx, jobID)
@@ -450,8 +491,12 @@ func createServerSecret(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := d.Vault.CreateSecret(ctx, name); err != nil {
@@ -469,8 +514,12 @@ func deleteServerSecret(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := d.Vault.DeleteSecret(ctx, name); err != nil {
@@ -488,8 +537,12 @@ func initServerDirectory(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)
@@ -508,8 +561,12 @@ func deleteServerDirectory(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)
@@ -548,8 +605,12 @@ func executeRCONCommand(d *Deps) server.ServerTool {
 			mcp.WithString("command", mcp.Required(), mcp.Description("RCON command to execute")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			command, err := req.RequireString("command")
@@ -580,8 +641,12 @@ func listBackups(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			backups, err := d.Minecraft.ListBackups(ctx, mcDir(name))
@@ -600,8 +665,12 @@ func createBackup(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			backup, err := d.Minecraft.CreateBackup(ctx, mcDir(name))
@@ -626,8 +695,12 @@ func downloadToServer(d *Deps) server.ServerTool {
 			mcp.WithNumber("gid", mcp.Description("File owner GID (default: 1001)")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			rawURL, err := req.RequireString("url")
@@ -666,8 +739,12 @@ func getDownloadStatus(d *Deps) server.ServerTool {
 			mcp.WithString("download_id", mcp.Required(), mcp.Description("Download ID returned by download_to_server")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			downloadID, err := req.RequireString("download_id")
@@ -692,8 +769,12 @@ func listArchiveContents(d *Deps) server.ServerTool {
 			mcp.WithString("path", mcp.Required(), mcp.Description("Relative path to the archive within the server directory")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			archivePath, err := req.RequireString("path")
@@ -718,8 +799,12 @@ func listServerFiles(d *Deps) server.ServerTool {
 			mcp.WithString("path", mcp.Description("Subdirectory path relative to server root (default: root directory). E.g., 'mods', 'config', 'logs'")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			subPath := req.GetString("path", "")
@@ -740,8 +825,12 @@ func readServerFile(d *Deps) server.ServerTool {
 			mcp.WithString("path", mcp.Required(), mcp.Description("Relative path to the file within the server directory")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			filePath, err := req.RequireString("path")
@@ -769,8 +858,12 @@ func writeServerFile(d *Deps) server.ServerTool {
 			mcp.WithNumber("gid", mcp.Description("File owner GID (default: 1001)")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			filePath, err := req.RequireString("path")
@@ -802,8 +895,12 @@ func moveServerFile(d *Deps) server.ServerTool {
 			mcp.WithString("dst_path", mcp.Required(), mcp.Description("Destination path relative to server root")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			srcPath, err := req.RequireString("src_path")
@@ -831,8 +928,12 @@ func deleteServerFile(d *Deps) server.ServerTool {
 			mcp.WithString("path", mcp.Required(), mcp.Description("Path to delete, relative to server root")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			filePath, err := req.RequireString("path")

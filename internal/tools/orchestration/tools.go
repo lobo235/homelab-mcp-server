@@ -15,6 +15,7 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/vault"
+	"github.com/lobo235/homelab-mcp-server/internal/tools/authz"
 	"github.com/lobo235/homelab-mcp-server/internal/validation"
 )
 
@@ -150,11 +151,15 @@ func provisionMinecraftServer(d *Deps) server.ServerTool {
 			mcp.WithString("hcl", mcp.Required(), mcp.Description("HCL job spec for the server")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := authz.ExtractUserContext(req)
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := authz.RequireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			hcl, err := req.RequireString("hcl")
@@ -183,11 +188,15 @@ func destroyMinecraftServer(d *Deps) server.ServerTool {
 			mcp.WithBoolean("delete_directory", mcp.Description("Also delete the server directory (default: false)")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := authz.ExtractUserContext(req)
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := authz.RequireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			deleteDir := req.GetBool("delete_directory", false)
@@ -242,11 +251,15 @@ func provisionNomadWorkload(d *Deps) server.ServerTool {
 			mcp.WithString("dns_answer", mcp.Description("Optional DNS answer IP for AdGuard rewrite")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := authz.ExtractUserContext(req)
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := authz.RequireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			hcl, err := req.RequireString("hcl")
@@ -294,11 +307,15 @@ func destroyNomadWorkload(d *Deps) server.ServerTool {
 			mcp.WithString("dns_domain", mcp.Description("DNS domain to remove from AdGuard")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := authz.ExtractUserContext(req)
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := authz.RequireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 

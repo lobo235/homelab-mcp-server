@@ -11,6 +11,7 @@ import (
 
 	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
+	"github.com/lobo235/homelab-mcp-server/internal/tools/authz"
 	"github.com/lobo235/homelab-mcp-server/internal/validation"
 )
 
@@ -47,6 +48,9 @@ func createMinecraftServer(d *Deps) server.ServerTool {
 			mcp.WithString("reference_job", mcp.Description("Specific job ID to use as reference (optional; auto-selects if omitted)")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			// Extract user context (creation doesn't require ownership check,
+			// but we still extract to clean up injected fields).
+			authz.ExtractUserContext(req)
 			serverName, err := req.RequireString("server_name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
@@ -104,11 +108,15 @@ func destroyMinecraftServerByName(d *Deps) server.ServerTool {
 			mcp.WithBoolean("delete_directory", mcp.Description("Also delete the server directory (default: false)")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := authz.ExtractUserContext(req)
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := authz.RequireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
@@ -135,11 +143,15 @@ func upgradeMinecraftServer(d *Deps) server.ServerTool {
 			mcp.WithString("new_version", mcp.Description("New modpack version or game version")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := authz.ExtractUserContext(req)
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := authz.RequireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			newVersion := req.GetString("new_version", "")
@@ -180,11 +192,15 @@ func getMinecraftServerStatus(d *Deps) server.ServerTool {
 			mcp.WithString("name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := authz.ExtractUserContext(req)
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := authz.RequireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
@@ -229,6 +245,8 @@ func deployGenericWorkload(d *Deps) server.ServerTool {
 			mcp.WithString("reference_job", mcp.Description("Specific job ID to use as reference (optional)")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			// Extract user context (creation doesn't require ownership check).
+			authz.ExtractUserContext(req)
 			description, err := req.RequireString("description")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
