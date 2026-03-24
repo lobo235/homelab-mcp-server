@@ -128,6 +128,8 @@ func main() {
 		CFZoneName:        cfg.CFZoneName,
 		ArtifactAllowlist: cfg.ArtifactAllowlist,
 		NFSBasePath:       cfg.NFSBasePath,
+		NomadDatacenter:   cfg.NomadDefaultDatacenter,
+		NomadNodePool:     cfg.NomadDefaultNodePool,
 	})
 
 	// Register Layer 2 — Orchestration tools.
@@ -142,6 +144,8 @@ func main() {
 		MCPublicDomain:    cfg.MCPublicDomain,
 		ArtifactAllowlist: cfg.ArtifactAllowlist,
 		NFSBasePath:       cfg.NFSBasePath,
+		NomadDatacenter:   cfg.NomadDefaultDatacenter,
+		NomadNodePool:     cfg.NomadDefaultNodePool,
 	})
 
 	// Register Layer 3 — High-level task tools.

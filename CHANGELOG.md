@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.3.3] - 2026-03-24
+
+### Added
+- Pre-flight validation checks datacenter and node_pool against expected values — catches misconfigured HCL before submission to Nomad
+
 ## [v1.3.2] - 2026-03-24
 
 ### Fixed

@@ -30,7 +30,7 @@ job "mc-test" {
 `
 
 func TestValidateJobSpec_Valid(t *testing.T) {
-	err := ValidateJobSpec(validHCL, nil, testVolumePrefix)
+	err := ValidateJobSpec(validHCL, nil, testVolumePrefix, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestValidateJobSpec_MissingJob(t *testing.T) {
     }
   }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for missing job block")
 	}
@@ -72,7 +72,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for network_mode = host")
 	}
@@ -92,7 +92,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for privileged = true")
 	}
@@ -112,7 +112,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for volume outside /mnt/data/")
 	}
@@ -132,7 +132,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for disallowed artifact source")
 	}
@@ -155,7 +155,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -178,7 +178,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, []string{"custom.example.com/"}, testVolumePrefix)
+	err := ValidateJobSpec(hcl, []string{"custom.example.com/"}, testVolumePrefix, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error with extra allowlist: %v", err)
 	}
@@ -198,7 +198,7 @@ job "BAD_NAME!" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for bad job name")
 	}
@@ -221,7 +221,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for cpu < 500")
 	}
@@ -244,7 +244,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -267,7 +267,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for memory < 512")
 	}
@@ -290,7 +290,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for memory > 32768")
 	}
@@ -361,7 +361,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for privileged = var.priv (variable interpolation)")
 	}
@@ -382,7 +382,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err == nil {
 		t.Fatal("expected error for network_mode = var.net_mode (variable interpolation)")
 	}
@@ -403,7 +403,7 @@ job "test-job" {
   }
 }
 `
-	err := ValidateJobSpec(hcl, nil, testVolumePrefix)
+	err := ValidateJobSpec(hcl, nil, testVolumePrefix, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

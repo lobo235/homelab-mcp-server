@@ -63,7 +63,8 @@ func (e *Error) Error() string {
 // 2. Security: no network_mode = "host", no privileged = true, volume mounts under volumePrefix only, artifact allowlist
 // 3. Naming: job ID matches ^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$
 // 4. Resources: CPU >= 500 MHz (or 0), memory >= 512 MB and <= 32768 MB
-func ValidateJobSpec(hcl string, extraAllowlist []string, volumePrefix string) error {
+// 5. Cluster: datacenter and node_pool must match expected values
+func ValidateJobSpec(hcl string, extraAllowlist []string, volumePrefix, expectedDatacenter, expectedNodePool string) error {
 	var errs []string
 
 	// Build full allowlist.
@@ -115,7 +116,11 @@ func ValidateJobSpec(hcl string, extraAllowlist []string, volumePrefix string) e
 		errs = append(errs, fmt.Sprintf("job ID %q does not match naming rules: must be 3-50 lowercase alphanumeric with hyphens", jobName))
 	}
 
-	// 4. Resource sanity.
+	// 4. Cluster validation.
+	clusterErrs := validateCluster(hcl, expectedDatacenter, expectedNodePool)
+	errs = append(errs, clusterErrs...)
+
+	// 5. Resource sanity.
 	resourceErrs := validateResources(hcl)
 	errs = append(errs, resourceErrs...)
 
@@ -250,4 +255,29 @@ func parseIntFromString(s string) int {
 		}
 	}
 	return n
+}
+
+var dcArrayRe = regexp.MustCompile(`datacenters\s*=\s*\[\s*"([^"]+)"`)
+
+// validateCluster checks datacenter and node_pool against expected values.
+func validateCluster(hcl, expectedDatacenter, expectedNodePool string) []string {
+	var errs []string
+	if expectedDatacenter != "" {
+		dcVal := extractFieldValue(hcl, "datacenters")
+		if dcVal == "" {
+			if m := dcArrayRe.FindStringSubmatch(hcl); len(m) >= 2 {
+				dcVal = m[1]
+			}
+		}
+		if dcVal != "" && dcVal != expectedDatacenter {
+			errs = append(errs, fmt.Sprintf("datacenter %q does not match expected %q", dcVal, expectedDatacenter))
+		}
+	}
+	if expectedNodePool != "" {
+		npVal := extractFieldValue(hcl, "node_pool")
+		if npVal != "" && npVal != expectedNodePool {
+			errs = append(errs, fmt.Sprintf("node_pool %q does not match expected %q", npVal, expectedNodePool))
+		}
+	}
+	return errs
 }
