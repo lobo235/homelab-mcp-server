@@ -80,13 +80,21 @@ func (b *Base) Do(ctx context.Context, method, path string, body any) (*http.Res
 		}
 	}
 
-	// Marshal body once (for retries).
+	// Marshal body once (for retries). String and []byte bodies are sent raw;
+	// all other types are JSON-encoded.
 	var bodyData []byte
 	if body != nil {
-		var err error
-		bodyData, err = json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("marshal request body: %w", err)
+		switch v := body.(type) {
+		case string:
+			bodyData = []byte(v)
+		case []byte:
+			bodyData = v
+		default:
+			var err error
+			bodyData, err = json.Marshal(body)
+			if err != nil {
+				return nil, fmt.Errorf("marshal request body: %w", err)
+			}
 		}
 	}
 

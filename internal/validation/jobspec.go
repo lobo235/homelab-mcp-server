@@ -20,8 +20,8 @@ var jobNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$`)
 // Must match vault-gateway's pattern: ^[a-z0-9][a-z0-9-]{0,47}$
 var serverNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,47}$`)
 
-// allocIDPattern validates Nomad allocation UUIDs.
-var allocIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+// allocIDPattern validates Nomad allocation IDs — full UUIDs or short prefixes (min 8 hex chars).
+var allocIDPattern = regexp.MustCompile(`^[0-9a-f]{8}[0-9a-f-]*$`)
 
 // ValidateServerName checks if a server name is safe for use in URL paths.
 func ValidateServerName(name string) error {
@@ -39,10 +39,11 @@ func MCServerDir(jobID string) string {
 	return strings.TrimPrefix(jobID, "mc-")
 }
 
-// ValidateAllocID checks if an allocation ID is a valid UUID.
+// ValidateAllocID checks if an allocation ID is a valid UUID or UUID prefix.
+// Nomad supports prefix matching, so short IDs (min 8 hex chars) are accepted.
 func ValidateAllocID(id string) error {
 	if !allocIDPattern.MatchString(id) {
-		return fmt.Errorf("invalid allocation ID %q: must be a UUID", id)
+		return fmt.Errorf("invalid allocation ID %q: must be a UUID or hex prefix (min 8 chars)", id)
 	}
 	return nil
 }

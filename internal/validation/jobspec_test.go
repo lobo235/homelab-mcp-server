@@ -326,9 +326,13 @@ func TestValidateAllocID(t *testing.T) {
 		id      string
 		wantErr bool
 	}{
-		{"a1b2c3d4-e5f6-7890-abcd-ef1234567890", false}, // valid UUID
+		{"a1b2c3d4-e5f6-7890-abcd-ef1234567890", false}, // valid full UUID
+		{"a1b2c3d4", false},                             // valid short prefix (8 chars)
+		{"a1b2c3d4-e5f6", false},                        // valid medium prefix
+		{"fcfc9967", false},                             // valid short prefix from Nomad UI
 		{"not-a-uuid", true},
 		{"", true},
+		{"a1b2c3", true}, // too short (< 8 hex chars)
 		{"../../../etc/passwd", true},
 		{"A1B2C3D4-E5F6-7890-ABCD-EF1234567890", true}, // uppercase not allowed
 	}

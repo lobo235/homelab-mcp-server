@@ -180,10 +180,10 @@ func getJobStatus(d *Deps) server.ServerTool {
 func getJobLogs(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("get_job_logs",
-			mcp.WithDescription("Get logs from a Nomad job allocation"),
+			mcp.WithDescription("Get logs from a Nomad job allocation. IMPORTANT: You must call get_job_status first to obtain a live allocation ID — do not guess or reuse stale IDs."),
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
-			mcp.WithString("alloc_id", mcp.Required(), mcp.Description("Allocation ID")),
-			mcp.WithString("task", mcp.Required(), mcp.Description("Task name within the allocation")),
+			mcp.WithString("alloc_id", mcp.Required(), mcp.Description("Allocation ID (get this from get_job_status)")),
+			mcp.WithString("task", mcp.Required(), mcp.Description("Task name within the allocation (get this from get_job_status)")),
 			mcp.WithString("log_type", mcp.Description("Log type: stdout or stderr (default: stdout)")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -257,9 +257,9 @@ func stopNomadJob(d *Deps) server.ServerTool {
 func restartNomadAllocation(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("restart_nomad_allocation",
-			mcp.WithDescription("Restart a specific Nomad allocation"),
+			mcp.WithDescription("Restart a specific Nomad allocation. Call get_job_status first to obtain a live allocation ID."),
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
-			mcp.WithString("alloc_id", mcp.Required(), mcp.Description("Allocation ID")),
+			mcp.WithString("alloc_id", mcp.Required(), mcp.Description("Allocation ID (get this from get_job_status)")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			jobID, err := requireJobID(req, "job_id")

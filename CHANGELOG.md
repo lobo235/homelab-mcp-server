@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.2.2] - 2026-03-24
+
+### Fixed
+- Job submission sends raw HCL to nomad-gateway instead of JSON-wrapping it — fixes "No argument or block type named hcl" parse errors
+- Allocation ID validation accepts UUID prefixes (min 8 hex chars) for compatibility with truncated IDs from tool output
+
+### Changed
+- `get_job_logs` and `restart_nomad_allocation` tool descriptions now instruct Claude to call `get_job_status` first to obtain a live allocation ID
+
 ## [v1.2.1] - 2026-03-24
 
 ### Added

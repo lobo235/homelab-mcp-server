@@ -44,11 +44,6 @@ type HealthStatus struct {
 	Status  string `json:"status"`
 }
 
-// SubmitRequest represents a job submission request.
-type SubmitRequest struct {
-	HCL string `json:"hcl"`
-}
-
 // SubmitResponse represents a job submission response.
 type SubmitResponse struct {
 	JobID string `json:"job_id"`
@@ -104,10 +99,10 @@ func (c *Client) GetJobSpec(ctx context.Context, jobID string) (string, error) {
 }
 
 // SubmitJob submits a raw HCL job spec.
+// The nomad-gateway expects the raw HCL text as the request body (not JSON-wrapped).
 func (c *Client) SubmitJob(ctx context.Context, hcl string) (*SubmitResponse, error) {
-	req := SubmitRequest{HCL: hcl}
 	var resp SubmitResponse
-	if err := c.base.DoJSON(ctx, "POST", "/jobs", req, &resp); err != nil {
+	if err := c.base.DoJSON(ctx, "POST", "/jobs", hcl, &resp); err != nil {
 		return nil, fmt.Errorf("submit job: %w", err)
 	}
 	return &resp, nil

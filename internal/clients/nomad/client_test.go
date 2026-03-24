@@ -3,8 +3,10 @@ package nomad
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -59,10 +61,12 @@ func TestClient_SubmitJob(t *testing.T) {
 		if r.Method != "POST" || r.URL.Path != "/jobs" {
 			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
 		}
-		var req SubmitRequest
-		json.NewDecoder(r.Body).Decode(&req)
-		if req.HCL == "" {
-			t.Error("empty HCL in request")
+		body, _ := io.ReadAll(r.Body)
+		if len(body) == 0 {
+			t.Error("empty body in request")
+		}
+		if !strings.Contains(string(body), "job") {
+			t.Error("body does not look like HCL")
 		}
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(SubmitResponse{JobID: "mc-new"})
