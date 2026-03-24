@@ -258,7 +258,7 @@ func TestClient_GetAllocationLogs(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(srv.URL, "test-key")
-	logs, err := client.GetAllocationLogs(context.Background(), "mc-atm10", "alloc-1", "server", "stdout")
+	logs, err := client.GetAllocationLogs(context.Background(), "mc-atm10", "alloc-1", "server", "stdout", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestClient_GetAllocationLogs_DefaultLogType(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(srv.URL, "test-key")
-	_, err := client.GetAllocationLogs(context.Background(), "mc-atm10", "alloc-1", "server", "")
+	_, err := client.GetAllocationLogs(context.Background(), "mc-atm10", "alloc-1", "server", "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestClient_GetAllocationLogs_URLEncoding(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(srv.URL, "test-key")
-	_, err := client.GetAllocationLogs(context.Background(), "mc-atm10", "alloc-1", "my task name", "stderr")
+	_, err := client.GetAllocationLogs(context.Background(), "mc-atm10", "alloc-1", "my task name", "stderr", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -313,7 +313,7 @@ func TestClient_GetAllocationLogs_Error(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(srv.URL, "test-key")
-	_, err := client.GetAllocationLogs(context.Background(), "mc-atm10", "nonexistent", "server", "stdout")
+	_, err := client.GetAllocationLogs(context.Background(), "mc-atm10", "nonexistent", "server", "stdout", "")
 	if err == nil {
 		t.Fatal("expected error")
 	}

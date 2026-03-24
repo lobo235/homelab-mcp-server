@@ -184,11 +184,12 @@ func getJobStatus(d *Deps) server.ServerTool {
 func getJobLogs(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("get_job_logs",
-			mcp.WithDescription("Get logs from a Nomad job allocation. IMPORTANT: You must call get_job_status first to obtain a live allocation ID — do not guess or reuse stale IDs."),
+			mcp.WithDescription("Get logs from a Nomad job allocation. Returns log_bytes in the response — if logs are large (>10KB), consider using the grep parameter to filter for specific patterns like 'ERROR', 'WARN', or mod names instead of fetching full logs. You must call get_job_status first to obtain a live allocation ID."),
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
 			mcp.WithString("alloc_id", mcp.Required(), mcp.Description("Allocation ID (get this from get_job_status)")),
 			mcp.WithString("task", mcp.Required(), mcp.Description("Task name within the allocation (get this from get_job_status)")),
 			mcp.WithString("log_type", mcp.Description("Log type: stdout or stderr (default: stdout)")),
+			mcp.WithString("grep", mcp.Description("Filter pattern — only return log lines containing this text (e.g., 'ERROR', 'WARN', 'client-only'). Use this for large logs instead of fetching everything.")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			jobID, err := requireJobID(req, "job_id")
@@ -204,11 +205,16 @@ func getJobLogs(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError("task is required"), nil
 			}
 			logType := req.GetString("log_type", "")
-			logs, err := d.Nomad.GetAllocationLogs(ctx, jobID, allocID, task, logType)
+			grep := req.GetString("grep", "")
+			logs, err := d.Nomad.GetAllocationLogs(ctx, jobID, allocID, task, logType, grep)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			return mcp.NewToolResultText(logs), nil
+			result := map[string]any{
+				"logs":      logs,
+				"log_bytes": len(logs),
+			}
+			return mcp.NewToolResultJSON(result)
 		},
 	}
 }

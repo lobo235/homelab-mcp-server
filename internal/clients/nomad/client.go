@@ -156,11 +156,15 @@ func (c *Client) RestartAllocation(ctx context.Context, jobID, allocID string) e
 
 // GetAllocationLogs returns logs for a specific allocation as plain text.
 // task is required by the nomad-gateway. logType defaults to "stdout" if empty.
-func (c *Client) GetAllocationLogs(ctx context.Context, jobID, allocID, task, logType string) (string, error) {
+// grep is optional — if set, only lines containing the pattern are returned.
+func (c *Client) GetAllocationLogs(ctx context.Context, jobID, allocID, task, logType, grep string) (string, error) {
 	if logType == "" {
 		logType = "stdout"
 	}
 	path := fmt.Sprintf("/jobs/%s/allocations/%s/logs?task=%s&type=%s", jobID, allocID, url.QueryEscape(task), url.QueryEscape(logType))
+	if grep != "" {
+		path += "&grep=" + url.QueryEscape(grep)
+	}
 	text, err := c.base.DoText(ctx, "GET", path, nil)
 	if err != nil {
 		return "", fmt.Errorf("get allocation logs %q: %w", allocID, err)
