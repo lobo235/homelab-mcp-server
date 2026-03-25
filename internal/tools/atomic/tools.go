@@ -178,12 +178,10 @@ func getJobSpec(d *Deps) server.ServerTool {
 			mcp.WithString("job_id", mcp.Required(), mcp.Description("Nomad job ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			_, role, ownedServers := extractUserContext(req)
+			// No ownership check — read-only, needed as reference template for new server creation.
+			extractUserContext(req)
 			jobID, err := requireJobID(req, "job_id")
 			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-			if err := requireJobAccess(role, jobID, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			spec, err := d.Nomad.GetJobSpec(ctx, jobID)

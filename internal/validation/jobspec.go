@@ -263,11 +263,11 @@ var dcArrayRe = regexp.MustCompile(`datacenters\s*=\s*\[\s*"([^"]+)"`)
 func validateCluster(hcl, expectedDatacenter, expectedNodePool string) []string {
 	var errs []string
 	if expectedDatacenter != "" {
-		dcVal := extractFieldValue(hcl, "datacenters")
-		if dcVal == "" {
-			if m := dcArrayRe.FindStringSubmatch(hcl); len(m) >= 2 {
-				dcVal = m[1]
-			}
+		// datacenters is always an array: datacenters = ["dc1"]
+		// Do NOT use extractFieldValue which would match the "[" bracket.
+		var dcVal string
+		if m := dcArrayRe.FindStringSubmatch(hcl); len(m) >= 2 {
+			dcVal = m[1]
 		}
 		if dcVal != "" && dcVal != expectedDatacenter {
 			errs = append(errs, fmt.Sprintf("datacenter %q does not match expected %q", dcVal, expectedDatacenter))
