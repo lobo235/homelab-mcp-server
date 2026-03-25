@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/vault"
 	"github.com/lobo235/homelab-mcp-server/internal/itzgcache"
+	"github.com/lobo235/homelab-mcp-server/internal/modpackkb"
 	"github.com/lobo235/homelab-mcp-server/internal/speccache"
 	"github.com/lobo235/homelab-mcp-server/internal/validation"
 )
@@ -74,6 +76,7 @@ type Deps struct {
 	Vault      *vault.Client
 	ItzgDocs   *itzgcache.Cache
 	SpecCache  *speccache.Cache
+	ModpackKB  *modpackkb.KB
 	Log        *slog.Logger
 
 	CFZoneName        string
@@ -138,6 +141,12 @@ func Register(s *server.MCPServer, d *Deps) {
 		// itzg documentation tools
 		searchItzgDocs(d),
 		getItzgDoc(d),
+
+		// Modpack knowledge base tools
+		getModpackKnowledge(d),
+		saveModpackKnowledge(d),
+		listModpackKnowledge(d),
+		deleteModpackKnowledge(d),
 	)
 }
 
@@ -1014,7 +1023,7 @@ func fetchArtifact(d *Deps) server.ServerTool {
 func searchModpacks(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("search_modpacks",
-			mcp.WithDescription("Search CurseForge for modpacks by name. Use this to find project IDs when you don't know them. Returns up to 10 results sorted by popularity."),
+			mcp.WithDescription("Search CurseForge for modpacks by name. Use this to find project IDs when you don't know them. Returns up to 10 results sorted by popularity. Results include deployment_knowledge if the modpack is in the knowledge base."),
 			mcp.WithString("query", mcp.Required(), mcp.Description("Search query (e.g., 'All the Mods 10', 'ATM9', 'RLCraft')")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -1026,6 +1035,14 @@ func searchModpacks(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
+
+			// Enrich with KB knowledge if available.
+			if d.ModpackKB != nil {
+				enriched := toMaps(results)
+				enriched = enrichResultsWithKB(d.ModpackKB, enriched)
+				return mcp.NewToolResultJSON(enriched)
+			}
+
 			return mcp.NewToolResultJSON(results)
 		},
 	}
@@ -1054,7 +1071,7 @@ func searchMods(d *Deps) server.ServerTool {
 func validateModpack(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("validate_modpack",
-			mcp.WithDescription("Validate a CurseForge modpack exists and return its details"),
+			mcp.WithDescription("Validate a CurseForge modpack exists and return its details. Includes deployment_knowledge if the modpack is in the knowledge base."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("CurseForge project ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -1066,6 +1083,14 @@ func validateModpack(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
+
+			// Enrich with KB knowledge if available.
+			if d.ModpackKB != nil {
+				enriched := toMap(modpack)
+				enriched = enrichWithKB(d.ModpackKB, enriched)
+				return mcp.NewToolResultJSON(enriched)
+			}
+
 			return mcp.NewToolResultJSON(modpack)
 		},
 	}
@@ -1074,7 +1099,7 @@ func validateModpack(d *Deps) server.ServerTool {
 func getModpackFiles(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("get_modpack_files",
-			mcp.WithDescription("List available server-pack files and versions for a modpack"),
+			mcp.WithDescription("List available server-pack files and versions for a modpack. Includes deployment_knowledge if the modpack is in the knowledge base."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("CurseForge project ID")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -1086,6 +1111,21 @@ func getModpackFiles(d *Deps) server.ServerTool {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
+
+			// Enrich with KB knowledge if available.
+			if d.ModpackKB != nil {
+				cfID, _ := strconv.Atoi(projectID)
+				if cfID > 0 {
+					if mk, kbErr := d.ModpackKB.GetByCurseForgeID(cfID); kbErr == nil {
+						result := map[string]any{
+							"files":                files,
+							"deployment_knowledge": mk,
+						}
+						return mcp.NewToolResultJSON(result)
+					}
+				}
+			}
+
 			return mcp.NewToolResultJSON(files)
 		},
 	}

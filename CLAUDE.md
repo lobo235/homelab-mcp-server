@@ -76,7 +76,10 @@ homelab-mcp-server/
     │   └── highlevel/         # Layer 3 — user intent fulfillment
     ├── validation/            # Job spec pre-flight checks
     ├── prompts/               # MCP prompt resources
-    └── resilience/            # Retry policy, circuit breaker
+    ├── resilience/            # Retry policy, circuit breaker
+    ├── speccache/             # Nomad job spec cache
+    ├── itzgcache/             # itzg docs cache
+    └── modpackkb/             # Modpack deployment knowledge base
 ```
 
 ## Configuration
@@ -127,6 +130,7 @@ internal/prompts/                 — MCP prompt resources (homelab_context, etc
 internal/resilience/              — Retry policy, circuit breaker, health checks
 internal/speccache/               — Nomad job spec cache (auto-seeded on startup)
 internal/itzgcache/               — itzg/docker-minecraft-server docs cache
+internal/modpackkb/               — Modpack deployment knowledge base (JSON files on disk)
 ```
 
 ## MCP Tools
@@ -173,6 +177,10 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `get_modpack_file` | curseforge | Get specific modpack file by file ID |
 | `validate_mod` | curseforge | Validate a CurseForge mod |
 | `get_mod_file` | curseforge | Get specific mod file by file ID |
+| `get_modpack_knowledge` | — | Look up modpack deployment knowledge by name/slug/CF ID |
+| `save_modpack_knowledge` | — | Save/update modpack deployment knowledge (admin-only) |
+| `list_modpack_knowledge` | — | List all known modpacks in the knowledge base |
+| `delete_modpack_knowledge` | — | Delete a modpack from the knowledge base (admin-only) |
 
 ### Layer 2 — Orchestration Tools
 

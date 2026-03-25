@@ -19,6 +19,7 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/clients/vault"
 	"github.com/lobo235/homelab-mcp-server/internal/config"
 	"github.com/lobo235/homelab-mcp-server/internal/itzgcache"
+	"github.com/lobo235/homelab-mcp-server/internal/modpackkb"
 	"github.com/lobo235/homelab-mcp-server/internal/prompts"
 	"github.com/lobo235/homelab-mcp-server/internal/resilience"
 	"github.com/lobo235/homelab-mcp-server/internal/speccache"
@@ -107,6 +108,15 @@ func main() {
 	defer itzgCancel()
 	itzgCache.StartBackgroundRefresh(itzgCtx, cfg.ItzgDocsRefreshInterval)
 
+	// Initialize modpack knowledge base.
+	modpackKBDir := filepath.Join(cfg.DataDir, "modpack-kb")
+	modpackKB, err := modpackkb.New(modpackKBDir, log)
+	if err != nil {
+		log.Error("modpack-kb init failed", "error", err)
+		os.Exit(1)
+	}
+	log.Info("modpack-kb initialized", "dir", modpackKBDir)
+
 	// Create MCP server.
 	s := server.NewMCPServer(
 		"homelab-mcp-server",
@@ -126,6 +136,7 @@ func main() {
 		Vault:             vaultClient,
 		ItzgDocs:          itzgCache,
 		SpecCache:         specCache,
+		ModpackKB:         modpackKB,
 		Log:               log,
 		CFZoneName:        cfg.CFZoneName,
 		ArtifactAllowlist: cfg.ArtifactAllowlist,
