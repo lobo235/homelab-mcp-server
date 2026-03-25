@@ -34,6 +34,7 @@ type ModpackFile struct {
 	FileLength       int64    `json:"fileLength"`
 	ReleaseType      int      `json:"releaseType"`
 	ServerPackFileID int      `json:"serverPackFileId"`
+	Changelog        string   `json:"changelog,omitempty"`
 }
 
 // Client wraps the curseforge-gateway HTTP API.
