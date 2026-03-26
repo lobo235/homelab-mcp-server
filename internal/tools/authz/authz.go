@@ -34,30 +34,49 @@ func ExtractUserContext(req mcp.CallToolRequest) (userID int64, role string, own
 
 // RequireServerAccess checks if the user has access to the given server.
 // Admins can access all servers. Non-admins can only access their owned servers.
+// Handles the mc-{name} / {name} convention: "survival" matches "mc-survival" and vice versa.
 // Empty role means legacy/no context — access is allowed for backward compatibility.
 func RequireServerAccess(role, serverName string, ownedServers []string) error {
 	if role == "admin" || role == "" {
 		return nil
 	}
-	for _, s := range ownedServers {
-		if s == serverName {
-			return nil
-		}
+	if matchesOwned(serverName, ownedServers) {
+		return nil
 	}
 	return fmt.Errorf("access denied: you don't have permission to access server %q", serverName)
 }
 
 // RequireJobAccess checks if the user has access to a Nomad job.
 // Admins can access all jobs. Non-admins can only access jobs matching their owned servers.
+// Handles the mc-{name} / {name} convention: "survival" matches "mc-survival" and vice versa.
 // Empty role means legacy/no context — access is allowed for backward compatibility.
 func RequireJobAccess(role, jobID string, ownedServers []string) error {
 	if role == "admin" || role == "" {
 		return nil
 	}
-	for _, s := range ownedServers {
-		if s == jobID {
-			return nil
-		}
+	if matchesOwned(jobID, ownedServers) {
+		return nil
 	}
 	return fmt.Errorf("access denied: you don't have permission to access job %q", jobID)
+}
+
+// matchesOwned checks if name matches any owned server, handling the mc- prefix convention.
+// "survival" matches "mc-survival", "mc-survival" matches "mc-survival", etc.
+func matchesOwned(name string, ownedServers []string) bool {
+	// Generate variants: if name is "survival", also try "mc-survival"; if "mc-survival", also try "survival".
+	variants := []string{name}
+	if strings.HasPrefix(name, "mc-") {
+		variants = append(variants, strings.TrimPrefix(name, "mc-"))
+	} else {
+		variants = append(variants, "mc-"+name)
+	}
+
+	for _, s := range ownedServers {
+		for _, v := range variants {
+			if s == v {
+				return true
+			}
+		}
+	}
+	return false
 }
