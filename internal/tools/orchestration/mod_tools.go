@@ -121,16 +121,7 @@ func validateAddModParams(req mcp.CallToolRequest) (*addModParams, error) {
 func (d *Deps) executeAddMod(ctx context.Context, p *addModParams) (map[string]any, error) {
 	// Auto-detect modloader from server HCL if not specified.
 	if p.modloader == "" {
-		if hcl, err := d.Nomad.GetJobSpec(ctx, p.serverName); err == nil {
-			for itzgType, mlName := range itzgTypeToModloader {
-				if strings.Contains(hcl, fmt.Sprintf(`TYPE = "%s"`, itzgType)) ||
-					strings.Contains(hcl, fmt.Sprintf(`TYPE = "%s"`, strings.ToLower(itzgType))) {
-					p.modloader = mlName
-					d.Log.Info("add_mod: detected server modloader from HCL", "modloader", mlName)
-					break
-				}
-			}
-		}
+		p.modloader = d.detectServerModloader(ctx, p.serverName)
 	}
 
 	// Validate the mod exists.
@@ -138,6 +129,11 @@ func (d *Deps) executeAddMod(ctx context.Context, p *addModParams) (map[string]a
 	mod, err := d.Curseforge.GetMod(ctx, p.modProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("mod validation failed for project %s: %w", p.modProjectID, err)
+	}
+
+	// If no modloader detected and no specific file requested, pick the best available.
+	if p.modloader == "" && p.fileID == "" {
+		d.selectPreferredModloader(ctx, p)
 	}
 
 	// Resolve the mod file.
@@ -293,6 +289,42 @@ func (d *Deps) resolveOneDep(ctx context.Context, modID int, p *addModParams) (*
 		FileName:   depFile.FileName,
 		DownloadID: dlResult.ID,
 	}, ""
+}
+
+// preferredModloaders is the order of preference when a server has no modloader set.
+// NeoForge first (modern, best compatibility), Fabric second, then Forge and Quilt.
+var preferredModloaders = []string{"NeoForge", "Fabric", "Forge", "Quilt"}
+
+// detectServerModloader reads the server's HCL and returns the modloader name if TYPE is set.
+func (d *Deps) detectServerModloader(ctx context.Context, serverName string) string {
+	hcl, err := d.Nomad.GetJobSpec(ctx, serverName)
+	if err != nil {
+		return ""
+	}
+	for itzgType, mlName := range itzgTypeToModloader {
+		if strings.Contains(hcl, fmt.Sprintf(`TYPE = "%s"`, itzgType)) ||
+			strings.Contains(hcl, fmt.Sprintf(`TYPE = "%s"`, strings.ToLower(itzgType))) {
+			d.Log.Info("add_mod: detected server modloader from HCL", "modloader", mlName)
+			return mlName
+		}
+	}
+	return ""
+}
+
+// selectPreferredModloader picks the best modloader for a mod when the server has none.
+// Fetches the mod's file list and tries each preferred modloader in order.
+func (d *Deps) selectPreferredModloader(ctx context.Context, p *addModParams) {
+	files, err := d.Curseforge.GetModFiles(ctx, p.modProjectID)
+	if err != nil {
+		return
+	}
+	for _, preferred := range preferredModloaders {
+		if f := findLatestCompatibleFile(files, p.gameVersion, preferred); f != nil {
+			p.modloader = preferred
+			d.Log.Info("add_mod: selected preferred modloader", "modloader", preferred)
+			return
+		}
+	}
 }
 
 // modloaderToItzgType maps modloader names to itzg/docker-minecraft-server TYPE values.
