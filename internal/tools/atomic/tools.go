@@ -498,12 +498,10 @@ func createServerSecret(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			_, role, ownedServers := extractUserContext(req)
+			// No ownership check — creation tool for new servers.
+			extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := d.Vault.CreateSecret(ctx, name); err != nil {
@@ -544,12 +542,10 @@ func initServerDirectory(d *Deps) server.ServerTool {
 			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			_, role, ownedServers := extractUserContext(req)
+			// No ownership check — creation tool for new servers.
+			extractUserContext(req)
 			name, err := requireServerName(req, "server_name")
 			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)

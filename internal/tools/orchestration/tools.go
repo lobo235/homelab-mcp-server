@@ -151,15 +151,14 @@ func provisionMinecraftServer(d *Deps) server.ServerTool {
 			mcp.WithString("hcl", mcp.Required(), mcp.Description("HCL job spec for the server")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			_, role, ownedServers := authz.ExtractUserContext(req)
+			// No ownership check — this is a creation tool. The chatbot enforces
+			// max_servers limits and records ownership after successful provisioning.
+			authz.ExtractUserContext(req)
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := validation.ValidateServerName(name); err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-			if err := authz.RequireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			hcl, err := req.RequireString("hcl")
@@ -251,15 +250,13 @@ func provisionNomadWorkload(d *Deps) server.ServerTool {
 			mcp.WithString("dns_answer", mcp.Description("Optional DNS answer IP for AdGuard rewrite")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			_, role, ownedServers := authz.ExtractUserContext(req)
+			// No ownership check — this is a creation tool.
+			authz.ExtractUserContext(req)
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := validation.ValidateServerName(name); err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-			if err := authz.RequireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			hcl, err := req.RequireString("hcl")
