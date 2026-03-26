@@ -250,6 +250,7 @@ Tool layers use `validation.MCServerDir(jobID)` to strip the `mc-` prefix for NF
 - Structured JSON logging via `log/slog` to stderr (stdout reserved for MCP stdio)
 - Version logged on startup
 - Never log secret values (API keys, passwords, tokens)
+- **UI-schema sync:** When data schemas change (e.g. `ModpackKnowledge`, `VersionKnowledge`, `ExtractedData`, MCP tool response shapes), flag that the chatbot's admin panel and frontend may need corresponding updates. Schema changes here often require form/display updates in `homelab-chatbot/internal/frontend/index.html`.
 
 ## Security Rules
 
