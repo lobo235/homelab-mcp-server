@@ -798,7 +798,7 @@ func listServerFiles(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("list_server_files",
 			mcp.WithDescription("List files and directories in a Minecraft server's filesystem. Use this to explore the server directory structure, find config files, check mod installations, etc."),
-			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name (bare name without mc- prefix, e.g., 'atm10')")),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name (e.g., mc-atm10)")),
 			mcp.WithString("path", mcp.Description("Subdirectory path relative to server root (default: root directory). E.g., 'mods', 'config', 'logs'")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -811,7 +811,8 @@ func listServerFiles(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			subPath := req.GetString("path", "")
-			files, err := d.Minecraft.ListFiles(ctx, name, subPath)
+			dirName := mcDir(name)
+			files, err := d.Minecraft.ListFiles(ctx, dirName, subPath)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
