@@ -141,9 +141,11 @@ func (c *Client) ListBackups(ctx context.Context, name string) ([]BackupInfo, er
 }
 
 // CreateBackup triggers a backup for a server.
-func (c *Client) CreateBackup(ctx context.Context, name string) (*BackupStatus, error) {
+// All backup files/dirs are chowned to uid:gid.
+func (c *Client) CreateBackup(ctx context.Context, name string, uid, gid int) (*BackupStatus, error) {
+	body := map[string]int{"uid": uid, "gid": gid}
 	var status BackupStatus
-	if err := c.base.DoJSON(ctx, "POST", "/servers/"+name+"/backups", nil, &status); err != nil {
+	if err := c.base.DoJSON(ctx, "POST", "/servers/"+name+"/backups", body, &status); err != nil {
 		return nil, fmt.Errorf("create backup for %q: %w", name, err)
 	}
 	return &status, nil
@@ -273,8 +275,9 @@ func (c *Client) RenameServer(ctx context.Context, oldName, newName string) erro
 }
 
 // MoveFile moves/renames a file or directory within a server's filesystem.
-func (c *Client) MoveFile(ctx context.Context, name, srcPath, dstPath string) error {
-	body := map[string]string{"src_path": srcPath, "dst_path": dstPath}
+// Parent directories are chowned to uid:gid.
+func (c *Client) MoveFile(ctx context.Context, name, srcPath, dstPath string, uid, gid int) error {
+	body := map[string]any{"src_path": srcPath, "dst_path": dstPath, "uid": uid, "gid": gid}
 	if err := c.base.DoNoContent(ctx, "POST", "/servers/"+name+"/files/move", body); err != nil {
 		return fmt.Errorf("move file for %q: %w", name, err)
 	}

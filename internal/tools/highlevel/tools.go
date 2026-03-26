@@ -159,7 +159,7 @@ func upgradeMinecraftServer(d *Deps) server.ServerTool {
 			// Step 1: Create a backup before upgrade (uses bare dir name).
 			dirName := mcDir(name)
 			d.Log.Info("upgrade: creating backup", "server", name, "dir", dirName)
-			backup, backupErr := d.Minecraft.CreateBackup(ctx, dirName)
+			backup, backupErr := d.Minecraft.CreateBackup(ctx, dirName, 1001, 1001)
 
 			// Step 2: Fetch current job spec.
 			spec, specErr := d.Nomad.GetJobSpec(ctx, name)

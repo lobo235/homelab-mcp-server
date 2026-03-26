@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.9.1] - 2026-03-26
+
+### Fixed
+- `CreateBackup` and `MoveFile` now pass uid:gid (1001:1001) to minecraft-gateway so backup dirs, archive files, and moved file parents are owned by the minecraft user instead of root
+
 ## [v1.9.0] - 2026-03-26
 
 ### Changed

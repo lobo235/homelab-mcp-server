@@ -686,7 +686,7 @@ func createBackup(d *Deps) server.ServerTool {
 			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			backup, err := d.Minecraft.CreateBackup(ctx, mcDir(name))
+			backup, err := d.Minecraft.CreateBackup(ctx, mcDir(name), 1001, 1001)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -926,7 +926,7 @@ func moveServerFile(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)
-			if err := d.Minecraft.MoveFile(ctx, dirName, srcPath, dstPath); err != nil {
+			if err := d.Minecraft.MoveFile(ctx, dirName, srcPath, dstPath, 1001, 1001); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultText(fmt.Sprintf("Moved %q to %q on server %q", srcPath, dstPath, name)), nil

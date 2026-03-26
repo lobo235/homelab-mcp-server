@@ -374,7 +374,7 @@ func TestClient_CreateBackup(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(srv.URL, "test-key")
-	status, err := client.CreateBackup(context.Background(), "atm10")
+	status, err := client.CreateBackup(context.Background(), "atm10", 1001, 1001)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -398,7 +398,7 @@ func TestClient_CreateBackup_Error(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(srv.URL, "test-key")
-	_, err := client.CreateBackup(context.Background(), "atm10")
+	_, err := client.CreateBackup(context.Background(), "atm10", 1001, 1001)
 	if err == nil {
 		t.Fatal("expected error")
 	}
