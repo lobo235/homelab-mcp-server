@@ -54,17 +54,27 @@ type addModParams struct {
 	modProjectID string
 	fileID       string
 	gameVersion  string
+	modloader    string // forge, neoforge, fabric, quilt — filters file selection
 	dirName      string
+}
+
+// itzgTypeToModloader maps itzg TYPE env var values to CurseForge modloader names.
+var itzgTypeToModloader = map[string]string{
+	"FORGE":    "Forge",
+	"NEOFORGE": "NeoForge",
+	"FABRIC":   "Fabric",
+	"QUILT":    "Quilt",
 }
 
 func addModToServer(d *Deps) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("add_mod_to_server",
-			mcp.WithDescription("Add a mod to a Minecraft server. Validates compatibility, resolves required dependencies, downloads the mod and its dependencies to the server's mods/ directory. Warns if the server needs a modloader change."),
-			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name (e.g., mc-atm10)")),
+			mcp.WithDescription("Add a mod to a Minecraft server. Validates compatibility, resolves required dependencies, downloads the mod and its dependencies to the server's mods/ directory. Auto-detects the server's modloader from its HCL config to pick the right mod version. Updates the server HCL if a modloader change is needed."),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name (e.g., mc-survival)")),
 			mcp.WithString("mod_project_id", mcp.Required(), mcp.Description("CurseForge mod project ID")),
-			mcp.WithString("file_id", mcp.Description("Specific file/version ID. If omitted, uses the latest compatible file.")),
+			mcp.WithString("file_id", mcp.Description("Specific file/version ID. If omitted, uses the latest compatible file for the server's modloader.")),
 			mcp.WithString("game_version", mcp.Description("Minecraft version to match (e.g., 1.20.1). If omitted, auto-detects from server.")),
+			mcp.WithString("modloader", mcp.Description("Preferred modloader: forge, neoforge, fabric, quilt. If omitted, auto-detects from server's TYPE env var.")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			params, err := validateAddModParams(req)
@@ -102,12 +112,27 @@ func validateAddModParams(req mcp.CallToolRequest) (*addModParams, error) {
 		modProjectID: modProjectID,
 		fileID:       req.GetString("file_id", ""),
 		gameVersion:  req.GetString("game_version", ""),
+		modloader:    req.GetString("modloader", ""),
 		dirName:      validation.MCServerDir(serverName),
 	}, nil
 }
 
 // executeAddMod runs the full add-mod workflow: validate, resolve file, resolve deps, download.
 func (d *Deps) executeAddMod(ctx context.Context, p *addModParams) (map[string]any, error) {
+	// Auto-detect modloader from server HCL if not specified.
+	if p.modloader == "" {
+		if hcl, err := d.Nomad.GetJobSpec(ctx, p.serverName); err == nil {
+			for itzgType, mlName := range itzgTypeToModloader {
+				if strings.Contains(hcl, fmt.Sprintf(`TYPE = "%s"`, itzgType)) ||
+					strings.Contains(hcl, fmt.Sprintf(`TYPE = "%s"`, strings.ToLower(itzgType))) {
+					p.modloader = mlName
+					d.Log.Info("add_mod: detected server modloader from HCL", "modloader", mlName)
+					break
+				}
+			}
+		}
+	}
+
 	// Validate the mod exists.
 	d.Log.Info("add_mod: validate mod", "server", p.serverName, "mod_project_id", p.modProjectID)
 	mod, err := d.Curseforge.GetMod(ctx, p.modProjectID)
@@ -197,7 +222,7 @@ func (d *Deps) resolveModFile(ctx context.Context, p *addModParams) (*cfclient.M
 	if err != nil {
 		return nil, fmt.Errorf("failed to get files for mod %s: %w", p.modProjectID, err)
 	}
-	best := findLatestCompatibleFile(files, p.gameVersion)
+	best := findLatestCompatibleFile(files, p.gameVersion, p.modloader)
 	if best == nil {
 		msg := fmt.Sprintf("no compatible file found for mod project %s", p.modProjectID)
 		if p.gameVersion != "" {
@@ -246,7 +271,7 @@ func (d *Deps) resolveOneDep(ctx context.Context, modID int, p *addModParams) (*
 		return nil, fmt.Sprintf("Could not get files for dependency %q (mod %s): %s", depMod.Name, depProjectID, err.Error())
 	}
 
-	depFile := findLatestCompatibleFile(depFiles, p.gameVersion)
+	depFile := findLatestCompatibleFile(depFiles, p.gameVersion, p.modloader)
 	if depFile == nil {
 		return nil, fmt.Sprintf("No compatible file found for dependency %q (mod %s)", depMod.Name, depProjectID)
 	}
@@ -334,11 +359,11 @@ func (d *Deps) ensureModloader(ctx context.Context, serverName, modloader string
 	return true, nil
 }
 
-// findLatestCompatibleFile picks the best file matching the game version.
+// findLatestCompatibleFile picks the best file matching the game version and modloader.
 // Preference order: release (1) > beta (2) > alpha (3).
 // Files are returned from CurseForge roughly in newest-first order,
 // so the first match at each release type is preferred.
-func findLatestCompatibleFile(files []cfclient.ModpackFile, gameVersion string) *cfclient.ModpackFile {
+func findLatestCompatibleFile(files []cfclient.ModpackFile, gameVersion, modloader string) *cfclient.ModpackFile {
 	var best *cfclient.ModpackFile
 	bestRelease := 4 // Lower is better: 1=release, 2=beta, 3=alpha.
 
@@ -346,6 +371,13 @@ func findLatestCompatibleFile(files []cfclient.ModpackFile, gameVersion string) 
 		f := &files[i]
 		if gameVersion != "" && !matchesGameVersion(f.GameVersions, gameVersion) {
 			continue
+		}
+		// Filter by modloader if specified.
+		if modloader != "" {
+			fileML := detectModloader(f.GameVersions)
+			if fileML != "" && !strings.EqualFold(fileML, modloader) {
+				continue
+			}
 		}
 		if best == nil || f.ReleaseType < bestRelease {
 			best = f
