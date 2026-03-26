@@ -41,6 +41,7 @@ func Register(s *server.MCPServer, d *Deps) {
 	s.AddTools(
 		provisionMinecraftServer(d),
 		destroyMinecraftServer(d),
+		renameMinecraftServer(d),
 		provisionNomadWorkload(d),
 		destroyNomadWorkload(d),
 	)
@@ -222,6 +223,190 @@ func destroyMinecraftServer(d *Deps) server.ServerTool {
 			if len(errors) > 0 {
 				result["errors"] = errors
 				result["status"] = "partially_destroyed"
+			}
+			return mcp.NewToolResultJSON(result)
+		},
+	}
+}
+
+// rollbackRename reverses completed rename steps in reverse order.
+// oldName is the original job name (mc-{name}), newName is the target job name.
+func (d *Deps) rollbackRename(ctx context.Context, oldName, newName string, steps []string) {
+	d.Log.Warn("rolling back rename", "old", oldName, "new", newName, "completed_steps", steps)
+	oldDir := validation.MCServerDir(oldName)
+	newDir := validation.MCServerDir(newName)
+	for i := len(steps) - 1; i >= 0; i-- {
+		switch steps[i] {
+		case "new_dns":
+			hostname := newDir + "." + d.MCPublicDomain
+			if err := d.Cloudflare.DeleteRecordByZoneName(ctx, d.CFZoneName, hostname); err != nil {
+				d.Log.Error("rollback: delete new DNS failed", "error", err)
+			}
+		case "old_dns":
+			// Re-create old DNS record.
+			hostname := oldDir + "." + d.MCPublicDomain
+			proxied := false
+			rec := cloudflare.DNSRecord{
+				Type: "CNAME", Name: hostname, Content: d.MCPublicDomain, TTL: 1, Proxied: &proxied,
+			}
+			if _, err := d.Cloudflare.CreateRecordByZoneName(ctx, d.CFZoneName, rec); err != nil {
+				d.Log.Error("rollback: re-create old DNS failed", "error", err)
+			}
+		case "new_job":
+			if err := d.Nomad.StopJob(ctx, newName); err != nil {
+				d.Log.Error("rollback: stop new job failed", "error", err)
+			}
+		case "new_secret":
+			if err := d.Vault.DeleteSecret(ctx, newName); err != nil {
+				d.Log.Error("rollback: delete new secret failed", "error", err)
+			}
+		case "old_secret":
+			// Re-create old secret (will get a new password, but better than nothing).
+			if err := d.Vault.CreateSecret(ctx, oldName); err != nil {
+				d.Log.Error("rollback: re-create old secret failed", "error", err)
+			}
+		case "directory":
+			// Rename directory back from new to old.
+			if err := d.Minecraft.RenameServer(ctx, newDir, oldDir); err != nil {
+				d.Log.Error("rollback: rename directory back failed", "error", err)
+			}
+		case "stop_old":
+			// Re-submit old job using original HCL (if we still have it, but we don't store it here).
+			// Best effort: log that manual intervention may be needed.
+			d.Log.Warn("rollback: old job was stopped but cannot be automatically restarted — manual intervention may be needed", "job", oldName)
+		}
+	}
+}
+
+// executeRename runs the multi-step Minecraft server rename workflow.
+// Order: stop old job, rename directory, create new secret, delete old secret,
+// fetch & update HCL, submit new job, delete old DNS, create new DNS.
+func (d *Deps) executeRename(ctx context.Context, oldName, newName, oldHCL string) (map[string]any, error) {
+	var steps []string
+	oldDir := validation.MCServerDir(oldName)
+	newDir := validation.MCServerDir(newName)
+	newHostname := newDir + "." + d.MCPublicDomain
+
+	// Step 1: Stop the old Nomad job.
+	d.Log.Info("rename: stop old job", "old", oldName)
+	if err := d.Nomad.StopJob(ctx, oldName); err != nil {
+		return nil, fmt.Errorf("step 1/7 stop old job failed: %w", err)
+	}
+	steps = append(steps, "stop_old")
+
+	// Step 2: Rename NFS directory (old bare name -> new bare name).
+	d.Log.Info("rename: rename directory", "old_dir", oldDir, "new_dir", newDir)
+	if err := d.Minecraft.RenameServer(ctx, oldDir, newDir); err != nil {
+		d.rollbackRename(ctx, oldName, newName, steps)
+		return nil, fmt.Errorf("step 2/7 rename directory failed: %w", err)
+	}
+	steps = append(steps, "directory")
+
+	// Step 3: Create new Vault secret (auto-generates new RCON password).
+	d.Log.Info("rename: create new secret", "new", newName)
+	if err := d.Vault.CreateSecret(ctx, newName); err != nil {
+		d.rollbackRename(ctx, oldName, newName, steps)
+		return nil, fmt.Errorf("step 3/7 create new secret failed: %w", err)
+	}
+	steps = append(steps, "new_secret")
+
+	// Step 4: Delete old Vault secret.
+	d.Log.Info("rename: delete old secret", "old", oldName)
+	if err := d.Vault.DeleteSecret(ctx, oldName); err != nil {
+		d.rollbackRename(ctx, oldName, newName, steps)
+		return nil, fmt.Errorf("step 4/7 delete old secret failed: %w", err)
+	}
+	steps = append(steps, "old_secret")
+
+	// Step 5: String-replace old name with new name in HCL and submit.
+	d.Log.Info("rename: update and submit HCL", "old", oldName, "new", newName)
+	newHCL := strings.ReplaceAll(oldHCL, oldName, newName)
+	newHCL = strings.ReplaceAll(newHCL, oldDir, newDir)
+	if _, err := d.Nomad.SubmitJob(ctx, newHCL); err != nil {
+		d.rollbackRename(ctx, oldName, newName, steps)
+		return nil, fmt.Errorf("step 5/7 submit renamed job failed: %w", err)
+	}
+	steps = append(steps, "new_job")
+
+	// Step 6: Delete old DNS CNAME.
+	oldHostname := oldDir + "." + d.MCPublicDomain
+	d.Log.Info("rename: delete old DNS", "hostname", oldHostname)
+	if err := d.Cloudflare.DeleteRecordByZoneName(ctx, d.CFZoneName, oldHostname); err != nil {
+		d.Log.Warn("rename: delete old DNS failed (non-fatal, continuing)", "error", err)
+		// Non-fatal: old DNS pointing to same domain is harmless.
+	}
+	steps = append(steps, "old_dns")
+
+	// Step 7: Create new DNS CNAME.
+	d.Log.Info("rename: create new DNS", "hostname", newHostname)
+	proxied := false
+	rec := cloudflare.DNSRecord{
+		Type: "CNAME", Name: newHostname, Content: d.MCPublicDomain, TTL: 1, Proxied: &proxied,
+	}
+	if _, err := d.Cloudflare.CreateRecordByZoneName(ctx, d.CFZoneName, rec); err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			d.Log.Info("rename: new DNS record already exists, continuing", "hostname", newHostname)
+		} else {
+			d.rollbackRename(ctx, oldName, newName, steps)
+			return nil, fmt.Errorf("step 7/7 create new DNS failed: %w", err)
+		}
+	}
+
+	result := map[string]any{
+		"old_name":     oldName,
+		"new_name":     newName,
+		"hostname":     newHostname,
+		"status":       "renamed",
+		"note":         "Server renamed successfully. It will take 1-5 minutes to start under the new name. Use get_minecraft_server_status to check when it's ready.",
+		"rcon_updated": true,
+	}
+	return result, nil
+}
+
+func renameMinecraftServer(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("rename_minecraft_server",
+			mcp.WithDescription("Rename a Minecraft server — stops the job, renames NFS directory, creates new Vault secret, submits renamed HCL, updates DNS. The old server is stopped and replaced."),
+			mcp.WithString("old_name", mcp.Required(), mcp.Description("Current server name (e.g., mc-survival)")),
+			mcp.WithString("new_name", mcp.Required(), mcp.Description("New server name (e.g., mc-austycraft)")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := authz.ExtractUserContext(req)
+			oldName, err := req.RequireString("old_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			newName, err := req.RequireString("new_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			// Validate both names.
+			if err := validation.ValidateServerName(oldName); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid old_name: %s", err.Error())), nil
+			}
+			if err := validation.ValidateServerName(newName); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid new_name: %s", err.Error())), nil
+			}
+			if oldName == newName {
+				return mcp.NewToolResultError("old_name and new_name must be different"), nil
+			}
+
+			// Authorization: user must own the old server.
+			if err := authz.RequireServerAccess(role, oldName, ownedServers); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			// Fetch the old job's HCL spec before stopping it.
+			d.Log.Info("rename: fetch old job spec", "server", oldName)
+			oldHCL, err := d.Nomad.GetJobSpec(ctx, oldName)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("failed to fetch old job spec: %s", err.Error())), nil
+			}
+
+			result, err := d.executeRename(ctx, oldName, newName, oldHCL)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultJSON(result)
 		},

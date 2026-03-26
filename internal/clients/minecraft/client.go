@@ -258,6 +258,20 @@ func (c *Client) WriteFile(ctx context.Context, name, path, content string, uid,
 	return nil
 }
 
+// renameServerRequest is the JSON body for POST /servers/{name}/rename.
+type renameServerRequest struct {
+	NewName string `json:"new_name"`
+}
+
+// RenameServer renames a server directory on the NFS filesystem.
+func (c *Client) RenameServer(ctx context.Context, oldName, newName string) error {
+	body := renameServerRequest{NewName: newName}
+	if err := c.base.DoNoContent(ctx, "POST", "/servers/"+oldName+"/rename", body); err != nil {
+		return fmt.Errorf("rename server %q to %q: %w", oldName, newName, err)
+	}
+	return nil
+}
+
 // MoveFile moves/renames a file or directory within a server's filesystem.
 func (c *Client) MoveFile(ctx context.Context, name, srcPath, dstPath string) error {
 	body := map[string]string{"src_path": srcPath, "dst_path": dstPath}

@@ -683,6 +683,51 @@ func TestClient_WriteFile_Error(t *testing.T) {
 	}
 }
 
+func TestClient_RenameServer(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/servers/oldname/rename" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var req renameServerRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		if req.NewName != "newname" {
+			t.Errorf("new_name = %q, want %q", req.NewName, "newname")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	err := client.RenameServer(context.Background(), "oldname", "newname")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestClient_RenameServer_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"code":    "not_found",
+			"message": "server not found",
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	err := client.RenameServer(context.Background(), "nonexistent", "newname")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestClient_ExecuteRCON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
