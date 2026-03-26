@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Server pack detection no longer relies solely on `ServerPackFileID` — now also checks the `IsServerPack` flag and filename heuristics ("server" in filename) across version-matched files, catching untagged server packs that many modpack authors upload as additional files
+- Deleting a KB entry now also removes its `.discovery` state file, so re-discovery starts fresh instead of finding stale state
 
 ## [v1.8.0] - 2026-03-26
 

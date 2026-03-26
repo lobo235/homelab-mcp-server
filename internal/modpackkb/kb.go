@@ -269,7 +269,7 @@ func (kb *KB) Save(mk *ModpackKnowledge) error {
 	return nil
 }
 
-// Delete removes a modpack knowledge file by slug.
+// Delete removes a modpack knowledge file and its discovery state by slug.
 func (kb *KB) Delete(slug string) error {
 	kb.mu.Lock()
 	defer kb.mu.Unlock()
@@ -280,6 +280,9 @@ func (kb *KB) Delete(slug string) error {
 		}
 		return fmt.Errorf("delete modpack %q: %w", slug, err)
 	}
+
+	// Clean up stale discovery state so re-discovery starts fresh.
+	_ = os.Remove(kb.discoveryStatePath(slug))
 
 	kb.log.Info("modpack-kb deleted", "slug", slug)
 	return nil
