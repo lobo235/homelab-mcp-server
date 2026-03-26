@@ -120,8 +120,15 @@ func validateAddModParams(req mcp.CallToolRequest) (*addModParams, error) {
 // executeAddMod runs the full add-mod workflow: validate, resolve file, resolve deps, download.
 func (d *Deps) executeAddMod(ctx context.Context, p *addModParams) (map[string]any, error) {
 	// Auto-detect modloader from server HCL if not specified.
+	// If the mods folder is empty, ignore the current modloader and use preference order
+	// so we can switch to a better modloader (e.g., Fabric → NeoForge).
 	if p.modloader == "" {
-		p.modloader = d.detectServerModloader(ctx, p.serverName)
+		detected := d.detectServerModloader(ctx, p.serverName)
+		if detected != "" && !d.isModsFolderEmpty(ctx, p.dirName) {
+			p.modloader = detected
+		}
+		// If modloader is still empty (no modloader set, or mods folder empty),
+		// selectPreferredModloader will pick the best one below.
 	}
 
 	// Validate the mod exists.
@@ -295,6 +302,15 @@ func (d *Deps) resolveOneDep(ctx context.Context, modID int, p *addModParams) (*
 // NeoForge first (modern, best compatibility), Fabric second, then Forge and Quilt.
 var preferredModloaders = []string{"NeoForge", "Fabric", "Forge", "Quilt"}
 
+// isModsFolderEmpty checks if the server's mods/ directory has any files.
+func (d *Deps) isModsFolderEmpty(ctx context.Context, dirName string) bool {
+	files, err := d.Minecraft.ListFiles(ctx, dirName, "mods")
+	if err != nil {
+		return true // Assume empty if we can't check (dir may not exist yet).
+	}
+	return len(files) == 0
+}
+
 // detectServerModloader reads the server's HCL and returns the modloader name if TYPE is set.
 func (d *Deps) detectServerModloader(ctx context.Context, serverName string) string {
 	hcl, err := d.Nomad.GetJobSpec(ctx, serverName)
@@ -324,6 +340,86 @@ func (d *Deps) selectPreferredModloader(ctx context.Context, p *addModParams) {
 			d.Log.Info("add_mod: selected preferred modloader", "modloader", preferred)
 			return
 		}
+	}
+}
+
+func setServerModloader(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("set_server_modloader",
+			mcp.WithDescription("Change a Minecraft server's modloader (e.g., switch from Fabric to NeoForge). Updates the HCL TYPE env var and restarts the server. WARNING: existing mods may not be compatible with the new modloader — check before switching."),
+			mcp.WithString("server_name", mcp.Required(), mcp.Description("Minecraft server name")),
+			mcp.WithString("modloader", mcp.Required(), mcp.Description("Target modloader: neoforge, forge, fabric, quilt, or vanilla")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, ownedServers := authz.ExtractUserContext(req)
+			serverName, err := req.RequireString("server_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := validation.ValidateServerName(serverName); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := authz.RequireServerAccess(role, serverName, ownedServers); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			modloader, err := req.RequireString("modloader")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			// Map to itzg TYPE value.
+			// Title-case: "neoforge" → "NeoForge", "fabric" → "Fabric"
+			lower := strings.ToLower(modloader)
+			for _, ml := range knownModloaders {
+				if strings.ToLower(ml) == lower {
+					modloader = ml
+					break
+				}
+			}
+			itzgType := "VANILLA"
+			if modloader != "Vanilla" {
+				t, ok := modloaderToItzgType[modloader]
+				if !ok {
+					return mcp.NewToolResultError(fmt.Sprintf("unknown modloader %q — valid options: neoforge, forge, fabric, quilt, vanilla", modloader)), nil
+				}
+				itzgType = t
+			}
+
+			updated, err := d.ensureModloader(ctx, serverName, modloader)
+			if err != nil && itzgType == "VANILLA" {
+				// For vanilla, remove TYPE or set to VANILLA.
+				hcl, hclErr := d.Nomad.GetJobSpec(ctx, serverName)
+				if hclErr != nil {
+					return mcp.NewToolResultError(fmt.Sprintf("fetch job spec: %s", hclErr.Error())), nil
+				}
+				newHCL := strings.Replace(hcl, `TYPE = "FORGE"`, `TYPE = "VANILLA"`, 1)
+				newHCL = strings.Replace(newHCL, `TYPE = "NEOFORGE"`, `TYPE = "VANILLA"`, 1)
+				newHCL = strings.Replace(newHCL, `TYPE = "FABRIC"`, `TYPE = "VANILLA"`, 1)
+				newHCL = strings.Replace(newHCL, `TYPE = "QUILT"`, `TYPE = "VANILLA"`, 1)
+				if newHCL != hcl {
+					if _, submitErr := d.Nomad.SubmitJob(ctx, newHCL); submitErr != nil {
+						return mcp.NewToolResultError(fmt.Sprintf("submit updated job: %s", submitErr.Error())), nil
+					}
+					updated = true
+				}
+			} else if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			result := map[string]any{
+				"server":    serverName,
+				"modloader": modloader,
+				"type":      itzgType,
+				"updated":   updated,
+				"status":    "ok",
+			}
+			if updated {
+				result["note"] = fmt.Sprintf("Server modloader changed to %s. The server will restart to apply the change.", modloader)
+			} else {
+				result["note"] = fmt.Sprintf("Server is already using %s.", modloader)
+			}
+			return mcp.NewToolResultJSON(result)
+		},
 	}
 }
 

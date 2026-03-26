@@ -47,6 +47,7 @@ func Register(s *server.MCPServer, d *Deps) {
 		provisionNomadWorkload(d),
 		destroyNomadWorkload(d),
 		addModToServer(d),
+		setServerModloader(d),
 	)
 }
 
