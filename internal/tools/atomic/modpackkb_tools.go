@@ -71,6 +71,8 @@ func saveModpackKnowledge(d *Deps) server.ServerTool {
 			mcp.WithString("max_memory", mcp.Description("JVM max memory (e.g., '8G')")),
 			mcp.WithString("deployment_notes", mcp.Description("Free-text deployment notes")),
 			mcp.WithString("source", mcp.Description("Knowledge source: manual, conversation, curseforge_api")),
+			mcp.WithBoolean("needs_review", mcp.Description("Whether this entry needs human review")),
+			mcp.WithString("confidence_flags", mcp.Description("JSON array of confidence flag strings")),
 			mcp.WithString("versions", mcp.Description("JSON array of version knowledge objects")),
 		),
 		Handler: func(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -122,13 +124,16 @@ func listModpackKnowledge(d *Deps) server.ServerTool {
 
 			// Return compact summaries.
 			type summary struct {
-				Slug             string `json:"slug"`
-				Name             string `json:"name"`
-				CurseForgeID     int    `json:"curseforge_id,omitempty"`
-				ModloaderType    string `json:"modloader_type"`
-				MinecraftVersion string `json:"minecraft_version,omitempty"`
-				HasServerPack    bool   `json:"has_server_pack"`
-				VersionCount     int    `json:"version_count"`
+				Slug             string   `json:"slug"`
+				Name             string   `json:"name"`
+				CurseForgeID     int      `json:"curseforge_id,omitempty"`
+				ModloaderType    string   `json:"modloader_type"`
+				MinecraftVersion string   `json:"minecraft_version,omitempty"`
+				HasServerPack    bool     `json:"has_server_pack"`
+				VersionCount     int      `json:"version_count"`
+				NeedsReview      bool     `json:"needs_review"`
+				ConfidenceFlags  []string `json:"confidence_flags,omitempty"`
+				SourcePlatform   string   `json:"source_platform,omitempty"`
 			}
 
 			summaries := make([]summary, 0, len(entries))
@@ -141,6 +146,9 @@ func listModpackKnowledge(d *Deps) server.ServerTool {
 					MinecraftVersion: mk.MinecraftVersion,
 					HasServerPack:    mk.HasServerPack,
 					VersionCount:     len(mk.Versions),
+					NeedsReview:      mk.NeedsReview,
+					ConfidenceFlags:  mk.ConfidenceFlags,
+					SourcePlatform:   mk.SourcePlatform,
 				})
 			}
 
@@ -225,6 +233,22 @@ func parseModpackArgs(req mcp.CallToolRequest) (*modpackkb.ModpackKnowledge, err
 		if b, isBool := v.(bool); isBool {
 			mk.HasServerPack = b
 		}
+	}
+
+	// Extract needs_review (special handling: allow setting to false).
+	if v, ok := args["needs_review"]; ok {
+		if b, isBool := v.(bool); isBool {
+			mk.NeedsReview = b
+		}
+	}
+
+	// Extract confidence_flags.
+	if flagsStr, ok := getStr(args, "confidence_flags"); ok && flagsStr != "" {
+		var flags []string
+		if err := json.Unmarshal([]byte(flagsStr), &flags); err != nil {
+			return nil, fmt.Errorf("invalid confidence_flags JSON: %w", err)
+		}
+		mk.ConfidenceFlags = flags
 	}
 
 	// Extract versions JSON string.
@@ -317,6 +341,98 @@ func enrichWithKB(kb *modpackkb.KB, result map[string]any) map[string]any {
 	}
 
 	return result
+}
+
+func triggerModpackDiscovery(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("trigger_modpack_discovery",
+			mcp.WithDescription("Start the modpack discovery pipeline for an unknown modpack. Downloads the pack, analyzes it, and creates a KB entry. Returns immediately with status. Use get_discovery_state to poll progress."),
+			mcp.WithString("slug", mcp.Required(), mcp.Description("URL-safe slug for the modpack (e.g., 'all-the-mods-10')")),
+			mcp.WithString("pack_name", mcp.Description("Human-readable pack name (e.g., 'All The Mods 10')")),
+			mcp.WithString("requested_version", mcp.Description("Specific version to discover (omit for latest)")),
+		),
+		Handler: func(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if d.Discovery == nil {
+				return mcp.NewToolResultError("discovery pipeline not initialized"), nil
+			}
+
+			slug, err := req.RequireString("slug")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			// Check if already in progress.
+			if d.Discovery.IsInProgress(slug) {
+				state, _ := d.Discovery.GetState(slug)
+				if state != nil {
+					return mcp.NewToolResultJSON(map[string]any{
+						"operation_id": slug,
+						"status":       state.Status,
+						"message":      "Discovery already in progress",
+					})
+				}
+			}
+
+			args := req.GetArguments()
+			packName, _ := getStr(args, "pack_name")
+			requestedVersion, _ := getStr(args, "requested_version")
+
+			// Extract user context for requested_by.
+			userID, _, _ := extractUserContext(req)
+			requestedBy := fmt.Sprintf("user_%d", userID)
+
+			// Start the pipeline (async — returns immediately).
+			ctx := context.Background()
+			if err := d.Discovery.Start(ctx, slug, packName, requestedVersion, requestedBy); err != nil {
+				return mcp.NewToolResultError("failed to start discovery: " + err.Error()), nil
+			}
+
+			return mcp.NewToolResultJSON(map[string]any{
+				"operation_id": slug,
+				"status":       "queued",
+			})
+		},
+	}
+}
+
+func getDiscoveryState(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("get_discovery_state",
+			mcp.WithDescription("Check the status of a modpack discovery pipeline. Returns current stage and progress."),
+			mcp.WithString("slug", mcp.Required(), mcp.Description("Modpack slug to check discovery status for")),
+		),
+		Handler: func(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if d.Discovery == nil {
+				return mcp.NewToolResultError("discovery pipeline not initialized"), nil
+			}
+
+			slug, err := req.RequireString("slug")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			state, err := d.Discovery.GetState(slug)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if state == nil {
+				return mcp.NewToolResultError(fmt.Sprintf("no discovery state found for %q", slug)), nil
+			}
+
+			// Map to poller-compatible response.
+			status := state.Status
+			if status == "ready" {
+				status = "done"
+			}
+
+			return mcp.NewToolResultJSON(map[string]any{
+				"status":          status,
+				"error":           state.Error,
+				"steps_completed": state.StepsCompleted,
+				"steps_remaining": state.StepsRemaining,
+			})
+		},
+	}
 }
 
 // enrichResultsWithKB enriches a slice of CurseForge results with KB knowledge.

@@ -14,10 +14,13 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/clients/adguard"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/cloudflare"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/curseforge"
+	"github.com/lobo235/homelab-mcp-server/internal/clients/ftb"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
+	"github.com/lobo235/homelab-mcp-server/internal/clients/modrinth"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/vault"
 	"github.com/lobo235/homelab-mcp-server/internal/config"
+	"github.com/lobo235/homelab-mcp-server/internal/discovery"
 	"github.com/lobo235/homelab-mcp-server/internal/itzgcache"
 	"github.com/lobo235/homelab-mcp-server/internal/modpackkb"
 	"github.com/lobo235/homelab-mcp-server/internal/prompts"
@@ -117,6 +120,20 @@ func main() {
 	}
 	log.Info("modpack-kb initialized", "dir", modpackKBDir)
 
+	// Initialize discovery pipeline.
+	modrinthClient := modrinth.NewClient("homelab-mcp-server/" + version)
+	ftbClient := ftb.NewClient()
+	discoveryPipeline := discovery.NewPipeline(discovery.PipelineConfig{
+		KB:           modpackKB,
+		CurseForge:   curseforgeClient,
+		Modrinth:     modrinthClient,
+		FTB:          ftbClient,
+		AnthropicKey: cfg.AnthropicAPIKey,
+		TempDir:      cfg.DiscoveryTempDir,
+		Log:          log,
+	})
+	log.Info("discovery pipeline initialized", "temp_dir", cfg.DiscoveryTempDir, "web_search", cfg.AnthropicAPIKey != "")
+
 	// Create MCP server.
 	s := server.NewMCPServer(
 		"homelab-mcp-server",
@@ -137,6 +154,7 @@ func main() {
 		ItzgDocs:          itzgCache,
 		SpecCache:         specCache,
 		ModpackKB:         modpackKB,
+		Discovery:         discoveryPipeline,
 		Log:               log,
 		CFZoneName:        cfg.CFZoneName,
 		ArtifactAllowlist: cfg.ArtifactAllowlist,

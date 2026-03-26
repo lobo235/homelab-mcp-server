@@ -66,6 +66,13 @@ func requireAllocID(req mcp.CallToolRequest, param string) (string, error) {
 	return id, nil
 }
 
+// DiscoveryPipeline is the interface for the modpack discovery pipeline.
+type DiscoveryPipeline interface {
+	Start(ctx context.Context, slug, packName, requestedVersion, requestedBy string) error
+	GetState(slug string) (*modpackkb.DiscoveryState, error)
+	IsInProgress(slug string) bool
+}
+
 // Deps holds the dependencies for atomic tools.
 type Deps struct {
 	Nomad      *nomad.Client
@@ -77,6 +84,7 @@ type Deps struct {
 	ItzgDocs   *itzgcache.Cache
 	SpecCache  *speccache.Cache
 	ModpackKB  *modpackkb.KB
+	Discovery  DiscoveryPipeline
 	Log        *slog.Logger
 
 	CFZoneName        string
@@ -147,6 +155,8 @@ func Register(s *server.MCPServer, d *Deps) {
 		saveModpackKnowledge(d),
 		listModpackKnowledge(d),
 		deleteModpackKnowledge(d),
+		triggerModpackDiscovery(d),
+		getDiscoveryState(d),
 	)
 }
 

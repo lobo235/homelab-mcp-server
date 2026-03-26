@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Modpack discovery pipeline — automated 7-stage async pipeline (resolve → download → extract → analyze → API enrich → web search → finalize) that auto-populates KB entries for unknown modpacks
+- `trigger_modpack_discovery` MCP tool — starts async discovery for a modpack slug
+- `get_discovery_state` MCP tool — polls discovery pipeline progress
+- Modrinth API client (`internal/clients/modrinth/`) — search projects, get versions, get project details
+- FTB API client (`internal/clients/ftb/`) — search packs, get pack/version details from api.modpacks.ch
+- Format-specific analyzers for CurseForge manifest.json, Modrinth modrinth.index.json, and FTB API-based packs
+- Mod intelligence database — client-only mod detection, extra port mods, heavy mods, world-gen mods
+- Anthropic web search enrichment — uses claude-sonnet with web_search tool to find deployment guides
+- Resource sizing heuristics — estimates RAM/CPU from mod count and heavy mod detection
+- Java version inference from Minecraft version
+- Discovery state tracking with `.discovery/<slug>.state.json` files
+- 20+ new fields on ModpackKnowledge schema (source_platform, modrinth_id, ftb_id, jvm_args, gc_strategy, startup_method, level_type, additional_ports, confidence_flags, needs_review, etc.)
+- `SearchModpackBySlug` method on CurseForge client
+- Integration tests with mock servers for all three platform formats
+- Research tool (`cmd/research/main.go`) for real-world pipeline validation
+
+### Fixed
+- Security: zip bomb protection with per-file (1GB) and total (5GB) extraction limits
+- Security: zip slip prevention with `..` path component rejection
+- Security: HTTPS-only download enforcement
+- Security: io.LimitReader bounds on all HTTP response reads (50MB for APIs, 2GB for downloads)
+- Security: slug validation regex prevents path traversal in KB and discovery state files
+- Security: sensitive keyword filtering in startup script parsing (passwords, tokens, keys)
+- Security: restrictive temp directory permissions (0o700)
+
 ## [v1.5.1] - 2026-03-24
 
 ### Fixed

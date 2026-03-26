@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/lobo235/homelab-mcp-server/internal/clients"
 )
@@ -124,6 +125,7 @@ func (c *Client) GetModFile(ctx context.Context, projectID, fileID string) (*Mod
 type SearchResult struct {
 	ID           int      `json:"id"`
 	Name         string   `json:"name"`
+	Slug         string   `json:"slug,omitempty"`
 	Summary      string   `json:"summary"`
 	ClassID      int      `json:"classId"`
 	GameVersions []string `json:"gameVersions,omitempty"`
@@ -137,6 +139,30 @@ func (c *Client) SearchModpacks(ctx context.Context, query string) ([]SearchResu
 		return nil, fmt.Errorf("search modpacks %q: %w", query, err)
 	}
 	return results, nil
+}
+
+// SearchModpackBySlug searches for a modpack by slug/name and returns the best match.
+// Returns nil if no match is found.
+func (c *Client) SearchModpackBySlug(ctx context.Context, slug string) (*SearchResult, error) {
+	results, err := c.SearchModpacks(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedSlug := strings.ToLower(strings.ReplaceAll(slug, "-", " "))
+	for i := range results {
+		resultSlug := strings.ToLower(strings.ReplaceAll(results[i].Slug, "-", " "))
+		resultName := strings.ToLower(results[i].Name)
+		if resultSlug == normalizedSlug || resultName == normalizedSlug {
+			return &results[i], nil
+		}
+	}
+
+	// No exact slug match; return first result if available.
+	if len(results) > 0 {
+		return &results[0], nil
+	}
+	return nil, nil
 }
 
 // SearchMods searches for mods by name.

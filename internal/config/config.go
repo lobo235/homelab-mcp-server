@@ -43,6 +43,10 @@ type Config struct {
 	// Data
 	DataDir                 string
 	ItzgDocsRefreshInterval time.Duration
+
+	// Discovery pipeline
+	AnthropicAPIKey  string
+	DiscoveryTempDir string
 }
 
 // SlogLevel converts the LogLevel string to a slog.Level.
@@ -152,6 +156,13 @@ func Load() (*Config, error) {
 
 	if cfg.DataDir == "" {
 		cfg.DataDir = "/data"
+	}
+
+	// Discovery pipeline (optional).
+	cfg.AnthropicAPIKey = os.Getenv("ANTHROPIC_API_KEY")
+	cfg.DiscoveryTempDir = os.Getenv("DISCOVERY_TEMP_DIR")
+	if cfg.DiscoveryTempDir == "" {
+		cfg.DiscoveryTempDir = "/tmp/modpack-discovery"
 	}
 
 	return cfg, nil

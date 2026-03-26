@@ -367,6 +367,103 @@ func TestExpandAbbreviation(t *testing.T) {
 	}
 }
 
+func TestSaveMergeNewFields(t *testing.T) {
+	kb := testKB(t)
+
+	// Save initial entry with new fields.
+	mk := &ModpackKnowledge{
+		Slug:                "test-pack",
+		Name:                "Test Pack",
+		SourcePlatform:      "modrinth",
+		ModrinthID:          "abc123",
+		FTBID:               42,
+		JVMArgs:             "-XX:+UseG1GC",
+		GCStrategy:          "g1gc",
+		StartupMethod:       "serverjar_direct",
+		LevelType:           "default",
+		NeedsReview:         true,
+		ConfidenceFlags:     []string{"no_server_pack_verified"},
+		AdditionalPorts:     []PortMapping{{Port: 25575, Protocol: "tcp", Purpose: "RCON", ModSlug: ""}},
+		KnownClientOnlyMods: []string{"optifine", "sodium"},
+		KnownProblematicMods: []ProblematicMod{
+			{ModSlug: "bad-mod", Issue: "crashes server", Action: "remove"},
+		},
+		RequiredExternalServices: []string{"mysql"},
+		RequiredConfigOverrides: map[string]map[string]string{
+			"server.properties": {"max-tick-time": "-1"},
+		},
+		PackDistributionFormat: "modrinth_mrpack",
+		Source:                 "discovery",
+		UpdatedBy:              "bot",
+	}
+	if err := kb.Save(mk); err != nil {
+		t.Fatalf("Save initial: %v", err)
+	}
+
+	// Update: change some fields, leave others.
+	update := &ModpackKnowledge{
+		Slug:        "test-pack",
+		GCStrategy:  "zgc",
+		NeedsReview: false, // should overwrite to false
+		Source:      "manual",
+		UpdatedBy:   "user",
+	}
+	if err := kb.Save(update); err != nil {
+		t.Fatalf("Save update: %v", err)
+	}
+
+	got, err := kb.Get("test-pack")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+
+	// Preserved fields.
+	if got.SourcePlatform != "modrinth" {
+		t.Errorf("SourcePlatform = %q, want %q", got.SourcePlatform, "modrinth")
+	}
+	if got.ModrinthID != "abc123" {
+		t.Errorf("ModrinthID = %q, want %q", got.ModrinthID, "abc123")
+	}
+	if got.FTBID != 42 {
+		t.Errorf("FTBID = %d, want %d", got.FTBID, 42)
+	}
+	if got.JVMArgs != "-XX:+UseG1GC" {
+		t.Errorf("JVMArgs = %q, want %q", got.JVMArgs, "-XX:+UseG1GC")
+	}
+	if got.StartupMethod != "serverjar_direct" {
+		t.Errorf("StartupMethod = %q, want %q", got.StartupMethod, "serverjar_direct")
+	}
+	if got.PackDistributionFormat != "modrinth_mrpack" {
+		t.Errorf("PackDistributionFormat = %q, want %q", got.PackDistributionFormat, "modrinth_mrpack")
+	}
+	if len(got.AdditionalPorts) != 1 {
+		t.Errorf("AdditionalPorts len = %d, want 1", len(got.AdditionalPorts))
+	}
+	if len(got.KnownClientOnlyMods) != 2 {
+		t.Errorf("KnownClientOnlyMods len = %d, want 2", len(got.KnownClientOnlyMods))
+	}
+	if len(got.KnownProblematicMods) != 1 {
+		t.Errorf("KnownProblematicMods len = %d, want 1", len(got.KnownProblematicMods))
+	}
+	if len(got.RequiredExternalServices) != 1 {
+		t.Errorf("RequiredExternalServices len = %d, want 1", len(got.RequiredExternalServices))
+	}
+	if got.RequiredConfigOverrides == nil {
+		t.Error("RequiredConfigOverrides should be preserved")
+	}
+
+	// Updated fields.
+	if got.GCStrategy != "zgc" {
+		t.Errorf("GCStrategy = %q, want %q", got.GCStrategy, "zgc")
+	}
+	if got.NeedsReview != false {
+		t.Error("NeedsReview should be false after merge")
+	}
+	if len(got.ConfidenceFlags) != 1 {
+		t.Errorf("ConfidenceFlags len = %d, want 1 (preserved)", len(got.ConfidenceFlags))
+	}
+}
+
 func TestSaveRequiresSlugOrName(t *testing.T) {
 	kb := testKB(t)
 	err := kb.Save(&ModpackKnowledge{})

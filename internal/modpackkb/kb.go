@@ -11,12 +11,31 @@ import (
 	"time"
 )
 
+// PortMapping describes a port required by a mod.
+type PortMapping struct {
+	Port     int    `json:"port"`
+	Protocol string `json:"protocol"` // tcp|udp
+	Purpose  string `json:"purpose"`
+	ModSlug  string `json:"mod_slug"`
+}
+
+// ProblematicMod describes a mod known to cause issues.
+type ProblematicMod struct {
+	ModSlug string `json:"mod_slug"`
+	Issue   string `json:"issue"`
+	Action  string `json:"action"` // remove|config_change|update
+}
+
 // ModpackKnowledge represents deployment knowledge for a modpack.
 type ModpackKnowledge struct {
 	// Identity
-	Slug         string `json:"slug"`
-	Name         string `json:"name"`
-	CurseForgeID int    `json:"curseforge_id,omitempty"`
+	Slug                   string `json:"slug"`
+	Name                   string `json:"name"`
+	CurseForgeID           int    `json:"curseforge_id,omitempty"`
+	SourcePlatform         string `json:"source_platform,omitempty"` // curseforge|modrinth|ftb
+	ModrinthID             string `json:"modrinth_id,omitempty"`
+	FTBID                  int    `json:"ftb_id,omitempty"`
+	PackDistributionFormat string `json:"pack_distribution_format,omitempty"` // curseforge_zip|modrinth_mrpack|ftb_pack|self_hosted_zip
 
 	// Modpack-wide defaults (apply unless a version overrides)
 	ModloaderType     string `json:"modloader_type"`
@@ -31,11 +50,36 @@ type ModpackKnowledge struct {
 	InitMemory        string `json:"init_memory,omitempty"`
 	MaxMemory         string `json:"max_memory,omitempty"`
 
+	// JVM Configuration
+	JVMArgs    string `json:"jvm_args,omitempty"`
+	GCStrategy string `json:"gc_strategy,omitempty"` // g1gc|zgc|shenandoah|default
+
+	// Startup Configuration
+	StartupMethod     string `json:"startup_method,omitempty"` // custom_script|serverjar_direct|bootstrap_installer
+	StartupScriptName string `json:"startup_script_name,omitempty"`
+	LevelType         string `json:"level_type,omitempty"`
+	FirstLaunchNotes  string `json:"first_launch_notes,omitempty"`
+
+	// Network
+	AdditionalPorts []PortMapping `json:"additional_ports,omitempty"`
+
+	// Server Config Overrides
+	RequiredConfigOverrides map[string]map[string]string `json:"required_config_overrides,omitempty"`
+
+	// Mod Intelligence
+	KnownClientOnlyMods      []string         `json:"known_client_only_mods,omitempty"`
+	KnownProblematicMods     []ProblematicMod `json:"known_problematic_mods,omitempty"`
+	RequiredExternalServices []string         `json:"required_external_services,omitempty"`
+
 	// Deployment notes (free text, modpack-wide)
 	DeploymentNotes string `json:"deployment_notes,omitempty"`
 
 	// Per-version knowledge (newest first)
 	Versions []VersionKnowledge `json:"versions,omitempty"`
+
+	// Review Status
+	NeedsReview     bool     `json:"needs_review"`
+	ConfidenceFlags []string `json:"confidence_flags,omitempty"`
 
 	// Metadata
 	Source    string `json:"source"`
@@ -46,17 +90,23 @@ type ModpackKnowledge struct {
 
 // VersionKnowledge captures deployment details specific to a modpack version.
 type VersionKnowledge struct {
-	PackVersion      string `json:"pack_version"`
-	MinecraftVersion string `json:"minecraft_version"`
-	ModloaderType    string `json:"modloader_type,omitempty"`
-	ModloaderVersion string `json:"modloader_version"`
-	JavaVersion      int    `json:"java_version"`
-	ItzgDockerTag    string `json:"itzg_docker_tag"`
-	ServerPackFileID int    `json:"server_pack_file_id,omitempty"`
-	ServerPackNotes  string `json:"server_pack_notes,omitempty"`
-	DeploymentNotes  string `json:"deployment_notes,omitempty"`
-	Source           string `json:"source"`
-	UpdatedAt        string `json:"updated_at"`
+	PackVersion       string   `json:"pack_version"`
+	MinecraftVersion  string   `json:"minecraft_version"`
+	ModloaderType     string   `json:"modloader_type,omitempty"`
+	ModloaderVersion  string   `json:"modloader_version"`
+	JavaVersion       int      `json:"java_version"`
+	ItzgDockerTag     string   `json:"itzg_docker_tag"`
+	ServerPackFileID  int      `json:"server_pack_file_id,omitempty"`
+	ServerPackNotes   string   `json:"server_pack_notes,omitempty"`
+	DeploymentNotes   string   `json:"deployment_notes,omitempty"`
+	ModrinthVersionID string   `json:"modrinth_version_id,omitempty"`
+	TotalModCount     int      `json:"total_mod_count,omitempty"`
+	ServerModCount    int      `json:"server_mod_count,omitempty"`
+	KnownIssues       []string `json:"known_issues,omitempty"`
+	DiscoveryMethod   string   `json:"discovery_method,omitempty"` // manifest_parse|mrpack_parse|ftb_api
+	SourceURLs        []string `json:"source_urls,omitempty"`
+	Source            string   `json:"source"`
+	UpdatedAt         string   `json:"updated_at"`
 }
 
 // KB is the modpack knowledge base backed by JSON files on disk.
@@ -70,6 +120,9 @@ type KB struct {
 func New(dir string, log *slog.Logger) (*KB, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create modpack-kb dir: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, ".discovery"), 0o755); err != nil {
+		return nil, fmt.Errorf("create modpack-kb .discovery dir: %w", err)
 	}
 	return &KB{dir: dir, log: log}, nil
 }
@@ -303,16 +356,32 @@ func (kb *KB) readUnlocked(slug string) (*ModpackKnowledge, error) {
 }
 
 func (kb *KB) path(slug string) string {
+	// Slug is validated upstream; this is defense-in-depth.
+	if validateSlug(slug) != nil {
+		return filepath.Join(kb.dir, "invalid.json")
+	}
 	return filepath.Join(kb.dir, slug+".json")
 }
 
 // mergeModpack overwrites fields in dst with non-zero values from src.
-func mergeModpack(dst, src *ModpackKnowledge) {
+func mergeModpack(dst, src *ModpackKnowledge) { //nolint:gocyclo // field-by-field merge is inherently complex
 	if src.Name != "" {
 		dst.Name = src.Name
 	}
 	if src.CurseForgeID != 0 {
 		dst.CurseForgeID = src.CurseForgeID
+	}
+	if src.SourcePlatform != "" {
+		dst.SourcePlatform = src.SourcePlatform
+	}
+	if src.ModrinthID != "" {
+		dst.ModrinthID = src.ModrinthID
+	}
+	if src.FTBID != 0 {
+		dst.FTBID = src.FTBID
+	}
+	if src.PackDistributionFormat != "" {
+		dst.PackDistributionFormat = src.PackDistributionFormat
 	}
 	if src.ModloaderType != "" {
 		dst.ModloaderType = src.ModloaderType
@@ -341,11 +410,49 @@ func mergeModpack(dst, src *ModpackKnowledge) {
 	if src.MaxMemory != "" {
 		dst.MaxMemory = src.MaxMemory
 	}
+	if src.JVMArgs != "" {
+		dst.JVMArgs = src.JVMArgs
+	}
+	if src.GCStrategy != "" {
+		dst.GCStrategy = src.GCStrategy
+	}
+	if src.StartupMethod != "" {
+		dst.StartupMethod = src.StartupMethod
+	}
+	if src.StartupScriptName != "" {
+		dst.StartupScriptName = src.StartupScriptName
+	}
+	if src.LevelType != "" {
+		dst.LevelType = src.LevelType
+	}
+	if src.FirstLaunchNotes != "" {
+		dst.FirstLaunchNotes = src.FirstLaunchNotes
+	}
+	if len(src.AdditionalPorts) > 0 {
+		dst.AdditionalPorts = src.AdditionalPorts
+	}
+	if src.RequiredConfigOverrides != nil {
+		dst.RequiredConfigOverrides = src.RequiredConfigOverrides
+	}
+	if len(src.KnownClientOnlyMods) > 0 {
+		dst.KnownClientOnlyMods = src.KnownClientOnlyMods
+	}
+	if len(src.KnownProblematicMods) > 0 {
+		dst.KnownProblematicMods = src.KnownProblematicMods
+	}
+	if len(src.RequiredExternalServices) > 0 {
+		dst.RequiredExternalServices = src.RequiredExternalServices
+	}
 	if src.DeploymentNotes != "" {
 		dst.DeploymentNotes = src.DeploymentNotes
 	}
 	if len(src.Versions) > 0 {
 		dst.Versions = mergeVersions(dst.Versions, src.Versions)
+	}
+	// NeedsReview: always overwrite from src (bool zero-value false is meaningful).
+	dst.NeedsReview = src.NeedsReview
+	if len(src.ConfidenceFlags) > 0 {
+		dst.ConfidenceFlags = src.ConfidenceFlags
 	}
 	if src.Source != "" {
 		dst.Source = src.Source

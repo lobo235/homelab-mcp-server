@@ -40,6 +40,9 @@ make run
 
 # Build binary
 go build -o homelab-mcp-server ./cmd/server
+
+# Run integration tests (requires integration build tag)
+go test -tags integration ./internal/discovery/
 ```
 
 ## Project Layout
@@ -69,7 +72,10 @@ homelab-mcp-server/
     │   ├── cloudflare/        # cloudflare-gateway HTTP client
     │   ├── minecraft/         # minecraft-gateway HTTP client
     │   ├── curseforge/        # curseforge-gateway HTTP client
+    │   ├── modrinth/          # Modrinth public API client
+    │   ├── ftb/               # FTB public API client (api.modpacks.ch)
     │   └── vault/             # vault-gateway HTTP client
+    ├── discovery/             # Modpack discovery pipeline (7-stage async)
     ├── tools/
     │   ├── atomic/            # Layer 1 — single gateway call tools
     │   ├── orchestration/     # Layer 2 — multi-step with rollback
@@ -110,6 +116,8 @@ All config via ENV vars. Loaded from `.env` in development (via `godotenv`; miss
 | `ARTIFACT_ALLOWLIST` | no | — | Additional artifact source domains (comma-separated) |
 | `DATA_DIR` | no | `/data` | Directory for spec cache, itzg docs, and state |
 | `ITZG_DOCS_REFRESH_INTERVAL` | no | `24h` | How often to refresh itzg docs cache |
+| `ANTHROPIC_API_KEY` | no | — | Anthropic API key for web search enrichment in discovery |
+| `DISCOVERY_TEMP_DIR` | no | `/tmp/modpack-discovery` | Temp directory for modpack downloads during discovery |
 
 ## Architecture
 
@@ -131,6 +139,9 @@ internal/resilience/              — Retry policy, circuit breaker, health chec
 internal/speccache/               — Nomad job spec cache (auto-seeded on startup)
 internal/itzgcache/               — itzg/docker-minecraft-server docs cache
 internal/modpackkb/               — Modpack deployment knowledge base (JSON files on disk)
+internal/discovery/               — Modpack discovery pipeline (resolve, download, extract, analyze, enrich, finalize)
+internal/clients/modrinth/        — Modrinth public API HTTP client
+internal/clients/ftb/             — FTB public API HTTP client (api.modpacks.ch)
 ```
 
 ## MCP Tools
@@ -181,6 +192,8 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `save_modpack_knowledge` | — | Save/update modpack deployment knowledge (admin-only) |
 | `list_modpack_knowledge` | — | List all known modpacks in the knowledge base |
 | `delete_modpack_knowledge` | — | Delete a modpack from the knowledge base (admin-only) |
+| `trigger_modpack_discovery` | — | Start async discovery pipeline for an unknown modpack |
+| `get_discovery_state` | — | Check status/progress of a running discovery pipeline |
 
 ### Layer 2 — Orchestration Tools
 

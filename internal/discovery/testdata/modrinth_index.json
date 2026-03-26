@@ -1,0 +1,15 @@
+{
+  "formatVersion": 1,
+  "game": "minecraft",
+  "versionId": "1.0.0",
+  "name": "Test Modrinth Pack",
+  "files": [
+    {"path": "mods/sodium-0.5.8.jar", "hashes": {"sha1": "abc123"}, "downloads": ["https://cdn.modrinth.com/data/AANobbMI/versions/test/sodium-0.5.8.jar"], "fileSize": 1000},
+    {"path": "mods/lithium-0.12.1.jar", "hashes": {"sha1": "def456"}, "downloads": ["https://cdn.modrinth.com/data/gvQqBUqZ/versions/test/lithium-0.12.1.jar"], "fileSize": 2000},
+    {"path": "mods/iris-1.7.0.jar", "hashes": {"sha1": "ghi789"}, "downloads": ["https://cdn.modrinth.com/data/YL57xq9U/versions/test/iris-1.7.0.jar"], "fileSize": 3000}
+  ],
+  "dependencies": {
+    "minecraft": "1.21.1",
+    "fabric-loader": "0.15.11"
+  }
+}
