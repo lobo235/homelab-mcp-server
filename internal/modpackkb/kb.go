@@ -64,7 +64,7 @@ type ModpackKnowledge struct {
 	AdditionalPorts []PortMapping `json:"additional_ports,omitempty"`
 
 	// Server Config Overrides
-	RequiredConfigOverrides map[string]map[string]string `json:"required_config_overrides,omitempty"`
+	RequiredConfigOverrides map[string]map[string]any `json:"required_config_overrides,omitempty"`
 
 	// Mod Intelligence
 	KnownClientOnlyMods      []string         `json:"known_client_only_mods,omitempty"`

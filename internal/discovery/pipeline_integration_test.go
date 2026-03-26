@@ -152,6 +152,22 @@ func TestIntegration_CurseForgeFullPipeline(t *testing.T) {
 				Summary: "A test modpack for integration testing",
 			})
 
+		// Get individual mod files (mod enrichment).
+		case strings.HasPrefix(path, "/mods/") && strings.Contains(path, "/files/"):
+			// Map projectID → filename for enrichment testing.
+			modFiles := map[string]curseforge.ModpackFile{
+				"/mods/238222/files/5000001": {ID: 5000001, FileName: "jei-1.21.1-neoforge-19.0.0.jar", DisplayName: "JEI 19.0.0"},
+				"/mods/306612/files/5000002": {ID: 5000002, FileName: "create-1.21.1-0.5.1.jar", DisplayName: "Create 0.5.1"},
+				"/mods/250398/files/5000003": {ID: 5000003, FileName: "appleskin-neoforge-mc1.21.1-2.5.1.jar", DisplayName: "AppleSkin 2.5.1"},
+				"/mods/243076/files/5000004": {ID: 5000004, FileName: "journeymap-1.21.1-6.0.0-neoforge.jar", DisplayName: "JourneyMap 6.0.0"},
+				"/mods/232131/files/5000005": {ID: 5000005, FileName: "optifine-1.21.1-HD_U_J1.jar", DisplayName: "OptiFine HD U J1"},
+			}
+			if file, ok := modFiles[path]; ok {
+				json.NewEncoder(w).Encode(file)
+			} else {
+				http.NotFound(w, r)
+			}
+
 		default:
 			t.Logf("unhandled CurseForge request: %s %s", r.Method, r.URL.String())
 			http.NotFound(w, r)
@@ -231,6 +247,28 @@ func TestIntegration_CurseForgeFullPipeline(t *testing.T) {
 	// Stage 5: API Enrichment.
 	if err := pipe.EnrichFromAPI(ctx, resolved, data); err != nil {
 		t.Fatalf("EnrichFromAPI: %v", err)
+	}
+
+	// Verify mod file enrichment populated filenames.
+	enrichedCount := 0
+	for _, m := range data.ModList {
+		if m.FileName != "" {
+			enrichedCount++
+		}
+	}
+	if enrichedCount != 5 {
+		t.Errorf("enriched mod count = %d, want 5", enrichedCount)
+	}
+
+	// Re-run mod intelligence (as pipeline.go does after enrichment).
+	refreshModIntelligence(data)
+
+	// After enrichment + mod intelligence, client-only mods should be detected.
+	if len(data.ClientOnlyMods) == 0 {
+		t.Error("expected client-only mods to be detected after enrichment (journeymap, optifine)")
+	}
+	if !containsString(data.ClientOnlyMods, "journeymap") && !containsSubstring(data.ClientOnlyMods, "journeymap") {
+		t.Errorf("ClientOnlyMods missing journeymap, got %v", data.ClientOnlyMods)
 	}
 
 	// Stage 6: Web search — skip (no API key).

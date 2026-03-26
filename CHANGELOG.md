@@ -24,7 +24,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Integration tests with mock servers for all three platform formats
 - Research tool (`cmd/research/main.go`) for real-world pipeline validation
 
+### Changed
+- Web search now uses `claude-sonnet-4-6` model with 16384 max_tokens (up from 4096) to prevent response truncation
+- Web search system prompt rewritten with explicit JSON-only output rules for reliable parsing
+- `ConfigOverrides` type changed from `map[string]map[string]string` to `map[string]map[string]any` to handle mixed value types from LLM responses
+- Downloader now tries server pack first, falls back to client pack (refactored into `downloadFile` helper)
+
 ### Fixed
+- Web search retry logic: exponential backoff, rate-limit retry-after header support, truncation detection with adaptive `max_uses` reduction
+- Web search rate limiting: 90-second minimum interval between API calls to stay within Anthropic API token limits
+- Web search response parsing: extract JSON from responses with preamble text or markdown fences
+- CurseForge mod enrichment: concurrent API calls (10-parallel, 500 cap) to resolve FileName/Slug from projectID/fileID, enabling mod intelligence (client-only detection, heavy mods)
+- Mod intelligence re-runs after API enrichment to pick up newly resolved slugs/filenames
+- Recursive manifest search (max depth 3) with server-pack directory fallback when manifest.json not found
 - Security: zip bomb protection with per-file (1GB) and total (5GB) extraction limits
 - Security: zip slip prevention with `..` path component rejection
 - Security: HTTPS-only download enforcement

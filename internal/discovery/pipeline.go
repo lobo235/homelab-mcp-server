@@ -163,6 +163,10 @@ func (p *Pipeline) run(ctx context.Context, slug, packName, requestedVersion str
 	if err := p.EnrichFromAPI(ctx, resolved, data); err != nil {
 		p.Log.Warn("api enrichment failed, continuing", "slug", slug, "error", err)
 	}
+
+	// Re-run mod intelligence now that API enrichment may have resolved mod slugs/filenames.
+	refreshModIntelligence(data)
+
 	if err := p.KB.UpdateDiscoveryState(slug, "web_searching", "api_enrich", ""); err != nil {
 		p.Log.Error("failed to update discovery state", "error", err)
 	}
@@ -187,6 +191,23 @@ func (p *Pipeline) run(ctx context.Context, slug, packName, requestedVersion str
 	}
 
 	p.Log.Info("discovery pipeline complete", "slug", slug, "needsReview", mk.NeedsReview, "flags", mk.ConfidenceFlags)
+}
+
+// refreshModIntelligence re-runs mod intelligence and recalculates mod counts.
+func refreshModIntelligence(data *ExtractedData) {
+	analyzeModIntelligence(data)
+	serverMods := 0
+	for _, m := range data.ModList {
+		slug := m.Slug
+		if slug == "" {
+			slug = modpackkb.Slugify(m.Name)
+		}
+		if !IsClientOnly(slug) && !IsClientOnlyFile(m.FileName) {
+			serverMods++
+		}
+	}
+	data.TotalModCount = len(data.ModList)
+	data.ServerModCount = serverMods
 }
 
 // failDiscovery marks the discovery as failed and logs the error.

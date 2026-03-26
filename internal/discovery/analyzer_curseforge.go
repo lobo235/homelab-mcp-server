@@ -30,6 +30,17 @@ type curseForgeManifest struct {
 // parseCurseForgeManifest reads and parses a CurseForge manifest.json.
 func parseCurseForgeManifest(extractDir string) (*ExtractedData, error) {
 	manifestPath := filepath.Join(extractDir, "manifest.json")
+
+	// Fast path: check root.
+	if _, err := os.Stat(manifestPath); err != nil {
+		// Search recursively (max depth 3).
+		found := findFile(extractDir, "manifest.json", 3)
+		if found == "" {
+			return nil, &manifestNotFoundError{format: "curseforge", dir: extractDir}
+		}
+		manifestPath = found
+	}
+
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return nil, fmt.Errorf("read manifest.json: %w", err)

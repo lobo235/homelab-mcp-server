@@ -34,6 +34,17 @@ type modrinthEnv struct {
 // parseModrinthIndex reads and parses a Modrinth modrinth.index.json.
 func parseModrinthIndex(extractDir string) (*ExtractedData, error) {
 	indexPath := filepath.Join(extractDir, "modrinth.index.json")
+
+	// Fast path: check root.
+	if _, err := os.Stat(indexPath); err != nil {
+		// Search recursively (max depth 3).
+		found := findFile(extractDir, "modrinth.index.json", 3)
+		if found == "" {
+			return nil, &manifestNotFoundError{format: "modrinth", dir: extractDir}
+		}
+		indexPath = found
+	}
+
 	raw, err := os.ReadFile(indexPath)
 	if err != nil {
 		return nil, fmt.Errorf("read modrinth.index.json: %w", err)

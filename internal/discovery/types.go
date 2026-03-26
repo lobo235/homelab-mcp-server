@@ -70,11 +70,11 @@ type ExtractedMod struct {
 
 // WebSearchResults holds structured data returned from LLM web search enrichment.
 type WebSearchResults struct {
-	RecommendedMemoryMB int                          `json:"recommended_memory_mb"`
-	JVMArgs             string                       `json:"jvm_args"`
-	KnownIssues         []string                     `json:"known_issues"`
-	ConfigOverrides     map[string]map[string]string `json:"config_overrides"`
-	ModsToRemove        []string                     `json:"mods_to_remove"`
-	DeploymentNotes     string                       `json:"deployment_notes"`
-	Sources             []string                     `json:"sources"`
+	RecommendedMemoryMB int                       `json:"recommended_memory_mb"`
+	JVMArgs             string                    `json:"jvm_args"`
+	KnownIssues         []string                  `json:"known_issues"`
+	ConfigOverrides     map[string]map[string]any `json:"config_overrides"`
+	ModsToRemove        []string                  `json:"mods_to_remove"`
+	DeploymentNotes     string                    `json:"deployment_notes"`
+	Sources             []string                  `json:"sources"`
 }

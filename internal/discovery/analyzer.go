@@ -3,13 +3,47 @@ package discovery
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/lobo235/homelab-mcp-server/internal/modpackkb"
 )
+
+// manifestNotFoundError indicates the format-specific manifest wasn't found.
+type manifestNotFoundError struct {
+	format string
+	dir    string
+}
+
+func (e *manifestNotFoundError) Error() string {
+	return fmt.Sprintf("%s manifest not found in %s", e.format, e.dir)
+}
+
+// findFile searches for a file by name within root up to maxDepth levels deep.
+func findFile(root, name string, maxDepth int) string {
+	var found string
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || found != "" {
+			return filepath.SkipDir
+		}
+		// Check depth.
+		rel, _ := filepath.Rel(root, path)
+		depth := strings.Count(rel, string(filepath.Separator))
+		if depth > maxDepth {
+			return filepath.SkipDir
+		}
+		if !d.IsDir() && d.Name() == name {
+			found = path
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return found
+}
 
 // Analyze performs mechanical analysis on an extracted modpack.
 // It delegates to a format-specific parser for manifest data, then runs
@@ -29,7 +63,15 @@ func (p *Pipeline) Analyze(ctx context.Context, extractDir string, resolved *Res
 		return nil, fmt.Errorf("unsupported format: %q", resolved.Format)
 	}
 
-	if err != nil {
+	// If manifest not found, try server-pack-style directory analysis.
+	var mnfErr *manifestNotFoundError
+	if errors.As(err, &mnfErr) {
+		p.Log.Info("manifest not found, attempting directory-based analysis", "format", resolved.Format, "dir", extractDir)
+		data, err = analyzeServerPackDir(extractDir)
+		if err != nil {
+			return nil, fmt.Errorf("fallback analysis failed: %w", err)
+		}
+	} else if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", resolved.Format, err)
 	}
 
@@ -214,6 +256,12 @@ func analyzeServerProperties(extractDir string, data *ExtractedData) {
 
 // analyzeModIntelligence scans the mod list and classifies mods.
 func analyzeModIntelligence(data *ExtractedData) {
+	// Clear previous results (allows safe re-run after enrichment).
+	data.ClientOnlyMods = nil
+	data.ExtraPortMods = nil
+	data.HeavyMods = nil
+	data.WorldGenMods = nil
+
 	for _, m := range data.ModList {
 		slug := m.Slug
 		if slug == "" {
@@ -245,4 +293,47 @@ func analyzeModIntelligence(data *ExtractedData) {
 			}
 		}
 	}
+}
+
+// analyzeServerPackDir performs best-effort analysis when no manifest is found.
+// This typically happens with server packs that contain raw server files.
+func analyzeServerPackDir(extractDir string) (*ExtractedData, error) {
+	data := &ExtractedData{}
+
+	// Scan mods/ directory for jar files.
+	modsDir := filepath.Join(extractDir, "mods")
+	entries, err := os.ReadDir(modsDir)
+	if err == nil {
+		for _, e := range entries {
+			if !e.IsDir() && strings.HasSuffix(strings.ToLower(e.Name()), ".jar") {
+				slug := slugFromFilename(e.Name())
+				data.ModList = append(data.ModList, ExtractedMod{
+					FileName: e.Name(),
+					Slug:     slug,
+					Name:     slug,
+				})
+			}
+		}
+	}
+
+	// Detect modloader from jar files at root.
+	rootEntries, err := os.ReadDir(extractDir)
+	if err == nil {
+		for _, e := range rootEntries {
+			name := strings.ToLower(e.Name())
+			if strings.HasSuffix(name, ".jar") {
+				switch {
+				case strings.Contains(name, "forge") && !strings.Contains(name, "neoforge"):
+					data.ModloaderType = "forge"
+				case strings.Contains(name, "neoforge"):
+					data.ModloaderType = "neoforge"
+				case strings.Contains(name, "fabric"):
+					data.ModloaderType = "fabric"
+				}
+			}
+		}
+	}
+
+	data.ConfidenceFlags = append(data.ConfidenceFlags, "directory_scan_fallback")
+	return data, nil
 }

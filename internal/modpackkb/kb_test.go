@@ -389,7 +389,7 @@ func TestSaveMergeNewFields(t *testing.T) {
 			{ModSlug: "bad-mod", Issue: "crashes server", Action: "remove"},
 		},
 		RequiredExternalServices: []string{"mysql"},
-		RequiredConfigOverrides: map[string]map[string]string{
+		RequiredConfigOverrides: map[string]map[string]any{
 			"server.properties": {"max-tick-time": "-1"},
 		},
 		PackDistributionFormat: "modrinth_mrpack",
