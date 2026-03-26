@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -71,22 +70,6 @@ func (d *Deps) rollbackProvision(ctx context.Context, name string, steps []strin
 	}
 }
 
-// waitForHealth polls job health for up to maxAttempts * interval.
-func (d *Deps) waitForHealth(ctx context.Context, jobID string, maxAttempts int, interval time.Duration) bool {
-	for i := 0; i < maxAttempts; i++ {
-		health, err := d.Nomad.GetJobHealth(ctx, jobID)
-		if err == nil && health.Healthy {
-			return true
-		}
-		select {
-		case <-ctx.Done():
-			return false
-		case <-time.After(interval):
-		}
-	}
-	return false
-}
-
 // executeProvision runs the 6-step Minecraft server provisioning workflow.
 // Order: DNS first (maximize propagation time), then secret, directory, job spec, submit, health.
 // Convention: job name is "mc-{name}" but DNS and NFS use bare "{name}".
@@ -116,7 +99,7 @@ func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[stri
 
 	// Step 3: Init NFS server directory — uses bare name without mc- prefix.
 	d.Log.Info("provision: init directory", "server", name, "dir", dirName)
-	if err := d.Minecraft.InitServer(ctx, dirName, 1000, 1000); err != nil {
+	if err := d.Minecraft.InitServer(ctx, dirName, 1001, 1001); err != nil {
 		d.rollbackProvision(ctx, name, steps)
 		return nil, fmt.Errorf("step 3/5 init directory failed: %w", err)
 	}
@@ -128,17 +111,11 @@ func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[stri
 		d.rollbackProvision(ctx, name, steps)
 		return nil, fmt.Errorf("step 4/5 submit job failed: %w", err)
 	}
-	steps = append(steps, "job")
-
-	// Step 5: Wait for health (up to 5 min).
-	d.Log.Info("provision: waiting for health", "server", name, "completed_steps", steps)
-	healthy := d.waitForHealth(ctx, name, 30, 10*time.Second)
-
+	// Don't wait for health — it blocks for minutes and kills the SSE connection.
+	// Return immediately and let the user check status later.
 	result := map[string]any{
-		"server": name, "hostname": hostname, "healthy": healthy, "status": "provisioned",
-	}
-	if !healthy {
-		result["warning"] = "server provisioned but not yet healthy — check status later"
+		"server": name, "hostname": hostname, "status": "provisioned",
+		"note": "Server provisioned successfully. It will take 1-5 minutes to start. Use get_minecraft_server_status to check when it's ready.",
 	}
 	return result, nil
 }
