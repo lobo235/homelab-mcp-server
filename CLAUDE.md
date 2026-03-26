@@ -190,6 +190,7 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `destroy_minecraft_server` | Stop job -> delete DNS -> delete secret -> (optionally) delete dir |
 | `provision_nomad_workload` | Submit job -> create AdGuard DNS rewrite |
 | `destroy_nomad_workload` | Stop job -> delete AdGuard DNS rewrite |
+| `add_mod_to_server` | Validate mod, resolve required dependencies, download mod + deps to server mods/ dir |
 
 ### Layer 3 — High-Level Task Tools
 

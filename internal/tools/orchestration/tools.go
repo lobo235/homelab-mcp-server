@@ -12,6 +12,7 @@ import (
 
 	"github.com/lobo235/homelab-mcp-server/internal/clients/adguard"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/cloudflare"
+	"github.com/lobo235/homelab-mcp-server/internal/clients/curseforge"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/vault"
@@ -25,6 +26,7 @@ type Deps struct {
 	Adguard    *adguard.Client
 	Cloudflare *cloudflare.Client
 	Minecraft  *minecraft.Client
+	Curseforge *curseforge.Client
 	Vault      *vault.Client
 	Log        *slog.Logger
 
@@ -44,6 +46,7 @@ func Register(s *server.MCPServer, d *Deps) {
 		renameMinecraftServer(d),
 		provisionNomadWorkload(d),
 		destroyNomadWorkload(d),
+		addModToServer(d),
 	)
 }
 

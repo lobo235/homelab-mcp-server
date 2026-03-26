@@ -23,18 +23,25 @@ type Mod struct {
 	Summary string `json:"summary"`
 }
 
+// ModDependency represents a dependency relationship for a CurseForge file.
+type ModDependency struct {
+	ModID        int `json:"modId"`
+	RelationType int `json:"relationType"`
+}
+
 // ModpackFile represents a file/version of a modpack.
 type ModpackFile struct {
-	ID               int      `json:"id"`
-	DisplayName      string   `json:"displayName"`
-	FileName         string   `json:"fileName"`
-	GameVersions     []string `json:"gameVersions"`
-	IsServerPack     bool     `json:"isServerPack"`
-	DownloadURL      string   `json:"downloadUrl"`
-	FileLength       int64    `json:"fileLength"`
-	ReleaseType      int      `json:"releaseType"`
-	ServerPackFileID int      `json:"serverPackFileId"`
-	Changelog        string   `json:"changelog,omitempty"`
+	ID               int             `json:"id"`
+	DisplayName      string          `json:"displayName"`
+	FileName         string          `json:"fileName"`
+	GameVersions     []string        `json:"gameVersions"`
+	IsServerPack     bool            `json:"isServerPack"`
+	DownloadURL      string          `json:"downloadUrl"`
+	FileLength       int64           `json:"fileLength"`
+	ReleaseType      int             `json:"releaseType"`
+	ServerPackFileID int             `json:"serverPackFileId"`
+	Changelog        string          `json:"changelog,omitempty"`
+	Dependencies     []ModDependency `json:"dependencies,omitempty"`
 }
 
 // Client wraps the curseforge-gateway HTTP API.

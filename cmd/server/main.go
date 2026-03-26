@@ -151,6 +151,7 @@ func main() {
 		Adguard:           adguardClient,
 		Cloudflare:        cfClient,
 		Minecraft:         mcClient,
+		Curseforge:        curseforgeClient,
 		Vault:             vaultClient,
 		Log:               log,
 		CFZoneName:        cfg.CFZoneName,
