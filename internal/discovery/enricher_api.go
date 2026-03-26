@@ -45,11 +45,11 @@ func (p *Pipeline) enrichFromCurseForge(ctx context.Context, resolved *ResolvedP
 	if !data.HasServerPack && resolved.ServerPackFileID == 0 {
 		files, err := p.CurseForge.GetModpackFiles(ctx, projectID)
 		if err == nil {
-			for _, f := range files {
-				if f.ServerPackFileID != 0 {
+			clientFile := findClientFileByURL(files, resolved.DownloadURL)
+			if clientFile != nil {
+				if sp := findServerPackFile(files, clientFile); sp != nil {
 					data.HasServerPack = true
 					data.ServerPackPattern = "curseforge_server_pack"
-					break
 				}
 			}
 		}

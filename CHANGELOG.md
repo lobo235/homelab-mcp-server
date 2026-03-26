@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.8.1] - 2026-03-26
+
+### Fixed
+- Server pack detection no longer relies solely on `ServerPackFileID` — now also checks the `IsServerPack` flag and filename heuristics ("server" in filename) across version-matched files, catching untagged server packs that many modpack authors upload as additional files
+
 ## [v1.8.0] - 2026-03-26
 
 ### Added

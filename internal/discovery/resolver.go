@@ -161,12 +161,17 @@ func (p *Pipeline) resolveCurseForge(ctx context.Context, slug, searchName, requ
 		Format:           "curseforge_zip",
 	}
 
-	// Check for server pack.
-	if file.ServerPackFileID != 0 {
-		rp.ServerPackFileID = file.ServerPackFileID
-		serverFile, err := p.CurseForge.GetModpackFile(ctx, projectID, strconv.Itoa(file.ServerPackFileID))
-		if err == nil && serverFile != nil && serverFile.DownloadURL != "" {
-			rp.ServerPackURL = serverFile.DownloadURL
+	// Check for server pack: tagged via ServerPackFileID, IsServerPack flag, or filename heuristic.
+	if sp := findServerPackFile(files, file); sp != nil {
+		rp.ServerPackFileID = sp.ID
+		if sp.DownloadURL != "" {
+			rp.ServerPackURL = sp.DownloadURL
+		} else {
+			// File list may omit download URLs; fetch the full file details.
+			fetched, fetchErr := p.CurseForge.GetModpackFile(ctx, projectID, strconv.Itoa(sp.ID))
+			if fetchErr == nil && fetched != nil && fetched.DownloadURL != "" {
+				rp.ServerPackURL = fetched.DownloadURL
+			}
 		}
 	}
 
@@ -223,6 +228,71 @@ func selectCurseForgeFile(files []curseforge.ModpackFile, requestedVersion strin
 		return latestBeta
 	}
 	return latest
+}
+
+// findServerPackFile finds the server pack file corresponding to the given client file.
+// It checks three sources in priority order:
+//  1. ServerPackFileID on the client file (authoritative when set)
+//  2. IsServerPack flag on files sharing at least one game version
+//  3. Filename containing "server" (case-insensitive) on version-matched files
+//
+// Returns nil if no server pack is found.
+func findServerPackFile(files []curseforge.ModpackFile, clientFile *curseforge.ModpackFile) *curseforge.ModpackFile {
+	// 1. Direct link via ServerPackFileID.
+	if clientFile.ServerPackFileID != 0 {
+		for i := range files {
+			if files[i].ID == clientFile.ServerPackFileID {
+				return &files[i]
+			}
+		}
+	}
+
+	// 2. IsServerPack flag with overlapping game versions.
+	for i := range files {
+		if files[i].ID == clientFile.ID {
+			continue
+		}
+		if files[i].IsServerPack && sharesGameVersion(&files[i], clientFile) {
+			return &files[i]
+		}
+	}
+
+	// 3. Filename heuristic: "server" in filename with overlapping game versions.
+	for i := range files {
+		if files[i].ID == clientFile.ID {
+			continue
+		}
+		if files[i].IsServerPack {
+			continue // Already checked above.
+		}
+		if sharesGameVersion(&files[i], clientFile) && strings.Contains(strings.ToLower(files[i].FileName), "server") {
+			return &files[i]
+		}
+	}
+
+	return nil
+}
+
+// sharesGameVersion returns true if two files share at least one game version string.
+func sharesGameVersion(a, b *curseforge.ModpackFile) bool {
+	for _, va := range a.GameVersions {
+		for _, vb := range b.GameVersions {
+			if va == vb {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// findClientFileByURL finds the file in a list matching the given download URL.
+func findClientFileByURL(files []curseforge.ModpackFile, downloadURL string) *curseforge.ModpackFile {
+	for i := range files {
+		if files[i].DownloadURL == downloadURL {
+			return &files[i]
+		}
+	}
+	return nil
 }
 
 // parseCurseForgeGameVersions extracts Minecraft version and modloader type
