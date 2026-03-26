@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -79,13 +80,18 @@ func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[stri
 	hostname := dirName + "." + d.MCPublicDomain
 
 	// Step 1: Create Cloudflare DNS CNAME (first to maximize propagation time).
+	// Idempotent: if the record already exists, log a warning and continue.
 	d.Log.Info("provision: create DNS", "server", name, "hostname", hostname)
 	proxied := false
 	rec := cloudflare.DNSRecord{
 		Type: "CNAME", Name: hostname, Content: d.MCPublicDomain, TTL: 1, Proxied: &proxied,
 	}
 	if _, err := d.Cloudflare.CreateRecordByZoneName(ctx, d.CFZoneName, rec); err != nil {
-		return nil, fmt.Errorf("step 1/5 create DNS failed: %w", err)
+		if strings.Contains(err.Error(), "already exists") {
+			d.Log.Info("provision: DNS record already exists, continuing", "hostname", hostname)
+		} else {
+			return nil, fmt.Errorf("step 1/5 create DNS failed: %w", err)
+		}
 	}
 	steps = append(steps, "dns")
 
@@ -98,10 +104,15 @@ func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[stri
 	steps = append(steps, "secret")
 
 	// Step 3: Init NFS server directory — uses bare name without mc- prefix.
+	// Idempotent: if directory already exists from a previous attempt, continue.
 	d.Log.Info("provision: init directory", "server", name, "dir", dirName)
 	if err := d.Minecraft.InitServer(ctx, dirName, 1001, 1001); err != nil {
-		d.rollbackProvision(ctx, name, steps)
-		return nil, fmt.Errorf("step 3/5 init directory failed: %w", err)
+		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "chown") {
+			d.Log.Info("provision: directory already exists or chown skipped, continuing", "dir", dirName)
+		} else {
+			d.rollbackProvision(ctx, name, steps)
+			return nil, fmt.Errorf("step 3/5 init directory failed: %w", err)
+		}
 	}
 	steps = append(steps, "directory")
 
