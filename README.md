@@ -8,6 +8,13 @@ Part of the [homelab-ai](https://github.com/lobo235/homelab-ai) platform.
 
 This server implements the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) and exposes tools that an AI assistant uses to manage Minecraft servers and other containerized workloads in a HashiCorp Nomad cluster. It aggregates capabilities from 6 gateway services into a unified, AI-friendly tool surface.
 
+Key capabilities:
+- **40+ MCP tools** across 3 layers (atomic, orchestration, high-level)
+- **Modpack Knowledge Base** — persistent deployment knowledge for Minecraft modpacks (RAM, JVM args, mod intelligence, config overrides)
+- **Discovery Pipeline** — 7-stage async pipeline that auto-populates KB entries for unknown modpacks (resolve, download, extract, analyze, API enrich, web search, finalize)
+- **Multi-platform modpack support** — CurseForge, Modrinth, and FTB API clients
+- **Web search enrichment** — uses Anthropic API with web search to find deployment guides, known issues, and server tuning recommendations
+
 ## Quick Start
 
 ```bash

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.8.0] - 2026-03-26
+
 ### Added
 - Modpack discovery pipeline — automated 7-stage async pipeline (resolve → download → extract → analyze → API enrich → web search → finalize) that auto-populates KB entries for unknown modpacks
 - `trigger_modpack_discovery` MCP tool — starts async discovery for a modpack slug
