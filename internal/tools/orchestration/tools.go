@@ -43,6 +43,7 @@ func Register(s *server.MCPServer, d *Deps) {
 	s.AddTools(
 		provisionMinecraftServer(d),
 		destroyMinecraftServer(d),
+		getDestroyStatus(),
 		renameMinecraftServer(d),
 		provisionNomadWorkload(d),
 		destroyNomadWorkload(d),
@@ -192,45 +193,84 @@ func destroyMinecraftServer(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			deleteDir := req.GetBool("delete_directory", false)
-			dirName := validation.MCServerDir(name)
 
-			var errors []string
+			// Run destruction in background to avoid blocking the SSE connection.
+			tracker.startDestroy(name, deleteDir)
+			go d.executeDestroy(name, deleteDir)
 
-			d.Log.Info("destroy: stop job", "server", name)
-			if err := d.Nomad.StopJob(ctx, name); err != nil {
-				d.Log.Error("destroy: stop job failed", "error", err)
-				errors = append(errors, fmt.Sprintf("stop job: %s", err.Error()))
-			}
-
-			hostname := dirName + "." + d.MCPublicDomain
-			d.Log.Info("destroy: delete DNS", "server", name, "hostname", hostname)
-			if err := d.Cloudflare.DeleteRecordByZoneName(ctx, d.CFZoneName, hostname); err != nil {
-				d.Log.Error("destroy: delete DNS failed", "error", err)
-				errors = append(errors, fmt.Sprintf("delete DNS: %s", err.Error()))
-			}
-
-			d.Log.Info("destroy: delete secret", "server", name)
-			if err := d.Vault.DeleteSecret(ctx, name); err != nil {
-				d.Log.Error("destroy: delete secret failed", "error", err)
-				errors = append(errors, fmt.Sprintf("delete secret: %s", err.Error()))
-			}
-
-			if deleteDir {
-				d.Log.Info("destroy: delete directory", "server", name, "dir", dirName)
-				if err := d.Minecraft.DeleteServer(ctx, dirName); err != nil {
-					d.Log.Error("destroy: delete directory failed", "error", err)
-					errors = append(errors, fmt.Sprintf("delete directory: %s", err.Error()))
-				}
-			}
-
-			result := map[string]any{"server": name, "status": "destroyed"}
-			if len(errors) > 0 {
-				result["errors"] = errors
-				result["status"] = "partially_destroyed"
+			result := map[string]any{
+				"server": name,
+				"status": "destroying",
+				"note":   "Server destruction started. Use get_destroy_status to check progress.",
 			}
 			return mcp.NewToolResultJSON(result)
 		},
 	}
+}
+
+func getDestroyStatus() server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("get_destroy_status",
+			mcp.WithDescription("Check the status of an async server destruction. Returns step progress, errors, and final status."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Server name (e.g. mc-myserver)")),
+		),
+		Handler: func(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			name, err := req.RequireString("name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			state := GetDestroyState(name)
+			if state == nil {
+				return mcp.NewToolResultError(fmt.Sprintf("no destroy operation found for %q", name)), nil
+			}
+			return mcp.NewToolResultJSON(state)
+		},
+	}
+}
+
+// executeDestroy runs the server destruction steps in the background.
+// Uses context.Background since the original request context may be cancelled.
+func (d *Deps) executeDestroy(name string, deleteDir bool) {
+	ctx := context.Background()
+	dirName := validation.MCServerDir(name)
+
+	d.Log.Info("destroy: stop job", "server", name)
+	if err := d.Nomad.StopJob(ctx, name); err != nil {
+		d.Log.Error("destroy: stop job failed", "error", err)
+		tracker.addError(name, fmt.Sprintf("stop job: %s", err.Error()))
+	} else {
+		tracker.addStep(name, "stop_job")
+	}
+
+	hostname := dirName + "." + d.MCPublicDomain
+	d.Log.Info("destroy: delete DNS", "server", name, "hostname", hostname)
+	if err := d.Cloudflare.DeleteRecordByZoneName(ctx, d.CFZoneName, hostname); err != nil {
+		d.Log.Error("destroy: delete DNS failed", "error", err)
+		tracker.addError(name, fmt.Sprintf("delete DNS: %s", err.Error()))
+	} else {
+		tracker.addStep(name, "delete_dns")
+	}
+
+	d.Log.Info("destroy: delete secret", "server", name)
+	if err := d.Vault.DeleteSecret(ctx, name); err != nil {
+		d.Log.Error("destroy: delete secret failed", "error", err)
+		tracker.addError(name, fmt.Sprintf("delete secret: %s", err.Error()))
+	} else {
+		tracker.addStep(name, "delete_secret")
+	}
+
+	if deleteDir {
+		d.Log.Info("destroy: delete directory", "server", name, "dir", dirName)
+		if err := d.Minecraft.DeleteServer(ctx, dirName); err != nil {
+			d.Log.Error("destroy: delete directory failed", "error", err)
+			tracker.addError(name, fmt.Sprintf("delete directory: %s", err.Error()))
+		} else {
+			tracker.addStep(name, "delete_directory")
+		}
+	}
+
+	tracker.complete(name)
+	d.Log.Info("destroy: complete", "server", name, "state", tracker.get(name).Status)
 }
 
 // rollbackRename reverses completed rename steps in reverse order.

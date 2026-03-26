@@ -200,7 +200,8 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | Tool | Description |
 |------|-------------|
 | `provision_minecraft_server` | Init dir -> create secret -> submit job -> create DNS -> wait health |
-| `destroy_minecraft_server` | Stop job -> delete DNS -> delete secret -> (optionally) delete dir |
+| `destroy_minecraft_server` | Async: stop job -> delete DNS -> delete secret -> (optionally) delete dir. Returns immediately. |
+| `get_destroy_status` | Check progress of an async server destruction |
 | `provision_nomad_workload` | Submit job -> create AdGuard DNS rewrite |
 | `destroy_nomad_workload` | Stop job -> delete AdGuard DNS rewrite |
 | `add_mod_to_server` | Validate mod, resolve required dependencies, download mod + deps to server mods/ dir |

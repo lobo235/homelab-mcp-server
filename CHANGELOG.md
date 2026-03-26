@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.9.0] - 2026-03-26
+
+### Changed
+- `destroy_minecraft_server` now runs asynchronously — returns immediately and performs cleanup (stop job, delete DNS, delete secret, delete directory) in a background goroutine to avoid breaking SSE connections
+
+### Added
+- `get_destroy_status` tool — check progress of an async server destruction (steps completed, errors, terminal status)
+
 ## [v1.8.1] - 2026-03-26
 
 ### Fixed
