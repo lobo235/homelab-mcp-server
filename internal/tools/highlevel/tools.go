@@ -245,8 +245,10 @@ func deployGenericWorkload(d *Deps) server.ServerTool {
 			mcp.WithString("reference_job", mcp.Description("Specific job ID to use as reference (optional)")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			// Extract user context (creation doesn't require ownership check).
-			authz.ExtractUserContext(req)
+			_, role, _ := authz.ExtractUserContext(req)
+			if err := authz.RequireAdmin(role); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 			description, err := req.RequireString("description")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil

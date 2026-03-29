@@ -33,7 +33,7 @@ type Deps struct {
 	CFZoneName        string
 	MCPublicDomain    string
 	ArtifactAllowlist []string
-	NFSBasePath       string
+	VolumeAllowlist   []string
 	NomadDatacenter   string
 	NomadNodePool     string
 }
@@ -160,7 +160,7 @@ func provisionMinecraftServer(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist, d.NFSBasePath, d.NomadDatacenter, d.NomadNodePool); err != nil {
+			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist, d.VolumeAllowlist, d.NomadDatacenter, d.NomadNodePool); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("invalid_job_spec: %s", err.Error())), nil
 			}
 
@@ -467,8 +467,10 @@ func provisionNomadWorkload(d *Deps) server.ServerTool {
 			mcp.WithString("dns_answer", mcp.Description("Optional DNS answer IP for AdGuard rewrite")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			// No ownership check — this is a creation tool.
-			authz.ExtractUserContext(req)
+			_, role, _ := authz.ExtractUserContext(req)
+			if err := authz.RequireAdmin(role); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
@@ -481,7 +483,7 @@ func provisionNomadWorkload(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist, d.NFSBasePath, d.NomadDatacenter, d.NomadNodePool); err != nil {
+			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist, d.VolumeAllowlist, d.NomadDatacenter, d.NomadNodePool); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("invalid_job_spec: %s", err.Error())), nil
 			}
 
@@ -521,15 +523,15 @@ func destroyNomadWorkload(d *Deps) server.ServerTool {
 			mcp.WithString("dns_domain", mcp.Description("DNS domain to remove from AdGuard")),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			_, role, ownedServers := authz.ExtractUserContext(req)
+			_, role, _ := authz.ExtractUserContext(req)
+			if err := authz.RequireAdmin(role); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 			name, err := req.RequireString("name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			if err := validation.ValidateServerName(name); err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-			if err := authz.RequireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 

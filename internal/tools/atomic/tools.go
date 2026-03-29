@@ -89,7 +89,7 @@ type Deps struct {
 
 	CFZoneName        string
 	ArtifactAllowlist []string
-	NFSBasePath       string
+	VolumeAllowlist   []string
 	NomadDatacenter   string
 	NomadNodePool     string
 }
@@ -115,9 +115,13 @@ func Register(s *server.MCPServer, d *Deps) {
 		createLocalDNSRewrite(d),
 		deleteLocalDNSRewrite(d),
 
-		// Vault tools
+		// Vault tools (Minecraft)
 		createServerSecret(d),
 		deleteServerSecret(d),
+
+		// Vault tools (generic — admin only)
+		createWorkloadSecret(d),
+		deleteWorkloadSecret(d),
 
 		// Minecraft tools
 		initServerDirectory(d),
@@ -305,7 +309,7 @@ func submitNomadJob(d *Deps) server.ServerTool {
 			}
 
 			// Pre-flight validation.
-			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist, d.NFSBasePath, d.NomadDatacenter, d.NomadNodePool); err != nil {
+			if err := validation.ValidateJobSpec(hcl, d.ArtifactAllowlist, d.VolumeAllowlist, d.NomadDatacenter, d.NomadNodePool); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("invalid_job_spec: %s", err.Error())), nil
 			}
 
@@ -541,6 +545,97 @@ func deleteServerSecret(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultText(fmt.Sprintf("Secret deleted for server %q", name)), nil
+		},
+	}
+}
+
+func createWorkloadSecret(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("create_workload_secret",
+			mcp.WithDescription("Create a generic workload secret with arbitrary key-value data (admin only)"),
+			mcp.WithString("category", mcp.Required(), mcp.Description("Secret category (e.g., gitea, postgres)")),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Secret name within the category")),
+			mcp.WithObject("data", mcp.Required(), mcp.Description("Key-value pairs to store as the secret")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, _ := extractUserContext(req)
+			if err := requireAdmin(role); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			category, err := req.RequireString("category")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			name, err := req.RequireString("name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			// Validate category and name.
+			if err := validation.ValidateServerName(category); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid category: %s", err.Error())), nil
+			}
+			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid name: %s", err.Error())), nil
+			}
+			// Extract data from the request arguments.
+			args := req.GetArguments()
+			dataRaw, ok := args["data"]
+			if !ok {
+				return mcp.NewToolResultError("data is required"), nil
+			}
+			dataMap, ok := dataRaw.(map[string]any)
+			if !ok {
+				return mcp.NewToolResultError("data must be a JSON object"), nil
+			}
+			data := make(map[string]string, len(dataMap))
+			for k, v := range dataMap {
+				s, ok := v.(string)
+				if !ok {
+					return mcp.NewToolResultError(fmt.Sprintf("data value for key %q must be a string", k)), nil
+				}
+				data[k] = s
+			}
+			if len(data) == 0 {
+				return mcp.NewToolResultError("data must contain at least one key-value pair"), nil
+			}
+			if err := d.Vault.CreateGenericSecret(ctx, category, name, data); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(fmt.Sprintf("Secret created: %s/%s (%d keys)", category, name, len(data))), nil
+		},
+	}
+}
+
+func deleteWorkloadSecret(d *Deps) server.ServerTool {
+	return server.ServerTool{
+		Tool: mcp.NewTool("delete_workload_secret",
+			mcp.WithDescription("Delete a generic workload secret (admin only)"),
+			mcp.WithString("category", mcp.Required(), mcp.Description("Secret category (e.g., gitea, postgres)")),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Secret name within the category")),
+		),
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			_, role, _ := extractUserContext(req)
+			if err := requireAdmin(role); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			category, err := req.RequireString("category")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			name, err := req.RequireString("name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if err := validation.ValidateServerName(category); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid category: %s", err.Error())), nil
+			}
+			if err := validation.ValidateServerName(name); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid name: %s", err.Error())), nil
+			}
+			if err := d.Vault.DeleteGenericSecret(ctx, category, name); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(fmt.Sprintf("Secret deleted: %s/%s", category, name)), nil
 		},
 	}
 }

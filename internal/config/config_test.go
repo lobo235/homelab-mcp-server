@@ -161,6 +161,35 @@ func TestLoad_ArtifactAllowlist(t *testing.T) {
 	}
 }
 
+func TestLoad_VolumeAllowlist(t *testing.T) {
+	setRequiredEnvVars(t)
+
+	// Without VOLUME_ALLOWLIST, should only contain NFS_BASE_PATH.
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.VolumeAllowlist) != 1 || cfg.VolumeAllowlist[0] != "/mnt/data/minecraft" {
+		t.Errorf("VolumeAllowlist = %v, want [/mnt/data/minecraft]", cfg.VolumeAllowlist)
+	}
+
+	// With VOLUME_ALLOWLIST, should include NFS_BASE_PATH + extras.
+	t.Setenv("VOLUME_ALLOWLIST", "/mnt/data/gitea, /mnt/data/postgres")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.VolumeAllowlist) != 3 {
+		t.Fatalf("VolumeAllowlist length = %d, want 3", len(cfg.VolumeAllowlist))
+	}
+	expected := []string{"/mnt/data/minecraft", "/mnt/data/gitea", "/mnt/data/postgres"}
+	for i, want := range expected {
+		if cfg.VolumeAllowlist[i] != want {
+			t.Errorf("VolumeAllowlist[%d] = %q, want %q", i, cfg.VolumeAllowlist[i], want)
+		}
+	}
+}
+
 func TestLoad_InvalidItzgDuration(t *testing.T) {
 	setRequiredEnvVars(t)
 	t.Setenv("ITZG_DOCS_REFRESH_INTERVAL", "not-a-duration")

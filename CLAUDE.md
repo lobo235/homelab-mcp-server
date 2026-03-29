@@ -110,6 +110,7 @@ All config via ENV vars. Loaded from `.env` in development (via `godotenv`; miss
 | `NOMAD_DEFAULT_DATACENTER` | yes | — | Default Nomad datacenter for job generation |
 | `NOMAD_DEFAULT_NODE_POOL` | no | `default` | Default node pool for MC jobs |
 | `NFS_BASE_PATH` | yes | — | NFS base path for Minecraft server volumes |
+| `VOLUME_ALLOWLIST` | no | — | Additional allowed volume mount prefixes (comma-separated) |
 | `MC_PUBLIC_DOMAIN` | yes | — | Public domain for MC server CNAMEs |
 | `MC_PUBLIC_IP` | no | — | Public IP for informational context (not used in operations) |
 | `CF_ZONE_NAME` | yes | — | Cloudflare zone name |
@@ -166,6 +167,8 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `delete_local_dns_rewrite` | adguard | Delete AdGuard DNS rewrite |
 | `create_server_secret` | vault | Create Minecraft server secrets |
 | `delete_server_secret` | vault | Delete Minecraft server secrets |
+| `create_workload_secret` | vault | Create generic workload secret (admin only) |
+| `delete_workload_secret` | vault | Delete generic workload secret (admin only) |
 | `init_server_directory` | minecraft | Initialize server NFS directory |
 | `delete_server_directory` | minecraft | Delete server NFS directory |
 | `execute_rcon_command` | minecraft | Send RCON command to server |
@@ -202,8 +205,8 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `provision_minecraft_server` | Init dir -> create secret -> submit job -> create DNS -> wait health |
 | `destroy_minecraft_server` | Async: stop job -> delete DNS -> delete secret -> (optionally) delete dir. Returns immediately. |
 | `get_destroy_status` | Check progress of an async server destruction |
-| `provision_nomad_workload` | Submit job -> create AdGuard DNS rewrite |
-| `destroy_nomad_workload` | Stop job -> delete AdGuard DNS rewrite |
+| `provision_nomad_workload` | Submit job -> create AdGuard DNS rewrite (admin only) |
+| `destroy_nomad_workload` | Stop job -> delete AdGuard DNS rewrite (admin only) |
 | `add_mod_to_server` | Validate mod, resolve required dependencies, download mod + deps to server mods/ dir |
 
 ### Layer 3 — High-Level Task Tools
@@ -214,7 +217,7 @@ All tools are registered with mcp-go v0.45.0 and served via stdio transport.
 | `destroy_minecraft_server_by_name` | Destroy by server name |
 | `upgrade_minecraft_server` | Backup -> update spec -> resubmit |
 | `get_minecraft_server_status` | Aggregate job state + allocation health |
-| `deploy_generic_workload` | Generate HCL from description, provision |
+| `deploy_generic_workload` | Generate HCL from description, provision (admin only) |
 
 ## Testing Approach
 

@@ -32,6 +32,15 @@ func ExtractUserContext(req mcp.CallToolRequest) (userID int64, role string, own
 	return
 }
 
+// RequireAdmin checks that the user has the admin role.
+// Empty role means legacy/no context — access is allowed for backward compatibility.
+func RequireAdmin(role string) error {
+	if role == "admin" || role == "" {
+		return nil
+	}
+	return fmt.Errorf("access denied: admin role required")
+}
+
 // RequireServerAccess checks if the user has access to the given server.
 // Admins can access all servers. Non-admins can only access their owned servers.
 // Handles the mc-{name} / {name} convention: "survival" matches "mc-survival" and vice versa.

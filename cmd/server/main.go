@@ -158,7 +158,7 @@ func main() {
 		Log:               log,
 		CFZoneName:        cfg.CFZoneName,
 		ArtifactAllowlist: cfg.ArtifactAllowlist,
-		NFSBasePath:       cfg.NFSBasePath,
+		VolumeAllowlist:   cfg.VolumeAllowlist,
 		NomadDatacenter:   cfg.NomadDefaultDatacenter,
 		NomadNodePool:     cfg.NomadDefaultNodePool,
 	})
@@ -175,7 +175,7 @@ func main() {
 		CFZoneName:        cfg.CFZoneName,
 		MCPublicDomain:    cfg.MCPublicDomain,
 		ArtifactAllowlist: cfg.ArtifactAllowlist,
-		NFSBasePath:       cfg.NFSBasePath,
+		VolumeAllowlist:   cfg.VolumeAllowlist,
 		NomadDatacenter:   cfg.NomadDefaultDatacenter,
 		NomadNodePool:     cfg.NomadDefaultNodePool,
 	})
@@ -192,6 +192,7 @@ func main() {
 		NomadDefaultDatacenter: cfg.NomadDefaultDatacenter,
 		NomadDefaultNodePool:   cfg.NomadDefaultNodePool,
 		NFSBasePath:            cfg.NFSBasePath,
+		VolumeAllowlist:        cfg.VolumeAllowlist,
 		MCPublicDomain:         cfg.MCPublicDomain,
 		MCPublicIP:             cfg.MCPublicIP,
 		CFZoneName:             cfg.CFZoneName,

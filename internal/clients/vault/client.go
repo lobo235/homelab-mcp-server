@@ -65,3 +65,41 @@ func (c *Client) DeleteSecret(ctx context.Context, serverName string) error {
 	}
 	return nil
 }
+
+// GenericSecretData is the request body for creating/updating generic secrets.
+type GenericSecretData struct {
+	Data map[string]string `json:"data"`
+}
+
+// GenericSecretResponse is the response for reading generic secrets.
+type GenericSecretResponse struct {
+	Category string            `json:"category"`
+	Name     string            `json:"name"`
+	Data     map[string]string `json:"data"`
+}
+
+// CreateGenericSecret creates a generic secret with caller-supplied key-value data.
+func (c *Client) CreateGenericSecret(ctx context.Context, category, name string, data map[string]string) error {
+	body := GenericSecretData{Data: data}
+	if err := c.base.DoNoContent(ctx, "POST", "/secrets/"+category+"/"+name, body); err != nil {
+		return fmt.Errorf("create generic secret %s/%s: %w", category, name, err)
+	}
+	return nil
+}
+
+// GetGenericSecret reads a generic secret.
+func (c *Client) GetGenericSecret(ctx context.Context, category, name string) (*GenericSecretResponse, error) {
+	var resp GenericSecretResponse
+	if err := c.base.DoJSON(ctx, "GET", "/secrets/"+category+"/"+name, nil, &resp); err != nil {
+		return nil, fmt.Errorf("get generic secret %s/%s: %w", category, name, err)
+	}
+	return &resp, nil
+}
+
+// DeleteGenericSecret deletes a generic secret.
+func (c *Client) DeleteGenericSecret(ctx context.Context, category, name string) error {
+	if err := c.base.DoNoContent(ctx, "DELETE", "/secrets/"+category+"/"+name, nil); err != nil {
+		return fmt.Errorf("delete generic secret %s/%s: %w", category, name, err)
+	}
+	return nil
+}

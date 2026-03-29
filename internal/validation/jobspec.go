@@ -60,11 +60,11 @@ func (e *Error) Error() string {
 // ValidateJobSpec performs pre-flight checks on a raw HCL job spec string.
 // It checks for:
 // 1. Required fields: job, group, task, driver = "docker", resources block
-// 2. Security: no network_mode = "host", no privileged = true, volume mounts under volumePrefix only, artifact allowlist
+// 2. Security: no network_mode = "host", no privileged = true, volume mounts under allowed prefixes only, artifact allowlist
 // 3. Naming: job ID matches ^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$
 // 4. Resources: CPU >= 500 MHz (or 0), memory >= 512 MB and <= 32768 MB
 // 5. Cluster: datacenter and node_pool must match expected values
-func ValidateJobSpec(hcl string, extraAllowlist []string, volumePrefix, expectedDatacenter, expectedNodePool string) error {
+func ValidateJobSpec(hcl string, extraAllowlist, volumePrefixes []string, expectedDatacenter, expectedNodePool string) error {
 	var errs []string
 
 	// Build full allowlist.
@@ -103,7 +103,7 @@ func ValidateJobSpec(hcl string, extraAllowlist []string, volumePrefix, expected
 	}
 
 	// Check volume mounts.
-	volumeErrs := validateVolumeMounts(hcl, volumePrefix)
+	volumeErrs := validateVolumeMounts(hcl, volumePrefixes)
 	errs = append(errs, volumeErrs...)
 
 	// Check artifact sources.
@@ -178,15 +178,22 @@ func extractJobName(hcl string) string {
 
 var volumeRe = regexp.MustCompile(`(?m)"(/[^"]+):`)
 
-// validateVolumeMounts ensures all volume mount sources are under the configured volume prefix.
-func validateVolumeMounts(hcl string, volumePrefix string) []string {
+// validateVolumeMounts ensures all volume mount sources are under one of the allowed prefixes.
+func validateVolumeMounts(hcl string, volumePrefixes []string) []string {
 	var errs []string
 	// Look for volumes = ["<host_path>:<container_path>"] patterns.
 	matches := volumeRe.FindAllStringSubmatch(hcl, -1)
 	for _, m := range matches {
 		hostPath := m[1]
-		if !strings.HasPrefix(hostPath, volumePrefix) {
-			errs = append(errs, fmt.Sprintf("volume mount %q is not under %q", hostPath, volumePrefix))
+		allowed := false
+		for _, prefix := range volumePrefixes {
+			if strings.HasPrefix(hostPath, prefix) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			errs = append(errs, fmt.Sprintf("volume mount %q is not under any allowed prefix %v", hostPath, volumePrefixes))
 		}
 	}
 	return errs

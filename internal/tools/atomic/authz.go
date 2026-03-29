@@ -20,3 +20,8 @@ func requireServerAccess(role, serverName string, ownedServers []string) error {
 func requireJobAccess(role, jobID string, ownedServers []string) error {
 	return authz.RequireJobAccess(role, jobID, ownedServers)
 }
+
+// requireAdmin checks that the user has the admin role.
+func requireAdmin(role string) error {
+	return authz.RequireAdmin(role)
+}

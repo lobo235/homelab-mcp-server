@@ -69,6 +69,28 @@ func TestExtractUserContext(t *testing.T) {
 	}
 }
 
+func TestRequireAdmin(t *testing.T) {
+	tests := []struct {
+		name    string
+		role    string
+		wantErr bool
+	}{
+		{"admin allowed", "admin", false},
+		{"empty role allowed (legacy)", "", false},
+		{"user denied", "user", true},
+		{"kid denied", "kid", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := RequireAdmin(tt.role)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("err = %v, wantErr = %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestRequireServerAccess(t *testing.T) {
 	tests := []struct {
 		name       string

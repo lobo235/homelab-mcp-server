@@ -14,6 +14,7 @@ type Config struct {
 	NomadDefaultDatacenter string
 	NomadDefaultNodePool   string
 	NFSBasePath            string
+	VolumeAllowlist        []string
 	MCPublicDomain         string
 	MCPublicIP             string
 	CFZoneName             string
@@ -69,13 +70,21 @@ func homelabContext(cfg *Config) (mcp.Prompt, server.PromptHandlerFunc) {
 - HashiCorp Vault stores RCON passwords, API tokens, and gateway keys
 - vault-gateway handles all Vault interactions via AppRole auth
 - RCON passwords are auto-generated (32 chars, [a-zA-Z0-9_.-])
+- Generic workload secrets can be created via create_workload_secret (admin-only)
 
 ## DNS Zones
 - Cloudflare zone: %s (for Minecraft server CNAMEs)
 - AdGuard Home: local DNS rewrites for internal services
+
+## Generic Workloads (Admin Only)
+- Admins can deploy non-Minecraft workloads using deploy_generic_workload and provision_nomad_workload
+- Volume mounts are allowed under these prefixes: %v
+- Generic secrets are stored in Vault under category-based paths (e.g., gitea/gitea, postgres/mydb)
+- DNS for internal services is managed via AdGuard Home rewrites
 `, cfg.NomadDefaultDatacenter, cfg.NomadDefaultNodePool,
 				cfg.MCPublicDomain, cfg.NFSBasePath,
-				cfg.MCPublicDomain, cfg.MCPublicDomain, cfg.CFZoneName)
+				cfg.MCPublicDomain, cfg.MCPublicDomain, cfg.CFZoneName,
+				cfg.VolumeAllowlist)
 
 			return mcp.NewGetPromptResult(
 				"Homelab infrastructure context for AI assistant",

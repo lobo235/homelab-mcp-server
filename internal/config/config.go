@@ -39,6 +39,7 @@ type Config struct {
 
 	// Security
 	ArtifactAllowlist []string
+	VolumeAllowlist   []string
 
 	// Data
 	DataDir                 string
@@ -99,6 +100,17 @@ func Load() (*Config, error) {
 			s = strings.TrimSpace(s)
 			if s != "" {
 				cfg.ArtifactAllowlist = append(cfg.ArtifactAllowlist, s)
+			}
+		}
+	}
+
+	// Parse volume allowlist — always includes NFS_BASE_PATH.
+	cfg.VolumeAllowlist = []string{cfg.NFSBasePath}
+	if v := os.Getenv("VOLUME_ALLOWLIST"); v != "" {
+		for _, s := range strings.Split(v, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				cfg.VolumeAllowlist = append(cfg.VolumeAllowlist, s)
 			}
 		}
 	}
