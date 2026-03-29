@@ -18,6 +18,7 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/clients/adguard"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/cloudflare"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/curseforge"
+	"github.com/lobo235/homelab-mcp-server/internal/clients/filesystem"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/vault"
@@ -79,6 +80,7 @@ type Deps struct {
 	Adguard    *adguard.Client
 	Cloudflare *cloudflare.Client
 	Minecraft  *minecraft.Client
+	Filesystem *filesystem.Client
 	Curseforge *curseforge.Client
 	Vault      *vault.Client
 	ItzgDocs   *itzgcache.Cache
@@ -654,7 +656,7 @@ func initServerDirectory(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)
-			if err := d.Minecraft.InitServer(ctx, dirName, 1001, 1001); err != nil {
+			if err := d.Filesystem.InitServer(ctx, dirName, 1001, 1001); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultText(fmt.Sprintf("Server directory initialized for %q (dir: %s)", name, dirName)), nil
@@ -678,7 +680,7 @@ func deleteServerDirectory(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)
-			if err := d.Minecraft.DeleteServer(ctx, dirName); err != nil {
+			if err := d.Filesystem.DeleteServer(ctx, dirName); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultText(fmt.Sprintf("Server directory deleted for %q (dir: %s)", name, dirName)), nil
@@ -757,7 +759,7 @@ func listBackups(d *Deps) server.ServerTool {
 			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			backups, err := d.Minecraft.ListBackups(ctx, mcDir(name))
+			backups, err := d.Filesystem.ListBackups(ctx, mcDir(name))
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -781,7 +783,7 @@ func createBackup(d *Deps) server.ServerTool {
 			if err := requireServerAccess(role, name, ownedServers); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			backup, err := d.Minecraft.CreateBackup(ctx, mcDir(name), 1001, 1001)
+			backup, err := d.Filesystem.CreateBackup(ctx, mcDir(name), 1001, 1001)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -822,7 +824,7 @@ func downloadToServer(d *Deps) server.ServerTool {
 			gid := req.GetInt("gid", 1001)
 
 			dirName := mcDir(name)
-			dlReq := minecraft.DownloadRequest{
+			dlReq := filesystem.DownloadRequest{
 				URL:      rawURL,
 				DestPath: destPath,
 				Extract:  extract,
@@ -830,7 +832,7 @@ func downloadToServer(d *Deps) server.ServerTool {
 				UID:      uid,
 				GID:      gid,
 			}
-			result, err := d.Minecraft.DownloadToServer(ctx, dirName, dlReq)
+			result, err := d.Filesystem.DownloadToServer(ctx, dirName, dlReq)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -860,7 +862,7 @@ func getDownloadStatus(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)
-			status, err := d.Minecraft.GetDownloadStatus(ctx, dirName, downloadID)
+			status, err := d.Filesystem.GetDownloadStatus(ctx, dirName, downloadID)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -890,7 +892,7 @@ func listArchiveContents(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)
-			entries, err := d.Minecraft.ListArchiveContents(ctx, dirName, archivePath)
+			entries, err := d.Filesystem.ListArchiveContents(ctx, dirName, archivePath)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -917,7 +919,7 @@ func listServerFiles(d *Deps) server.ServerTool {
 			}
 			subPath := req.GetString("path", "")
 			dirName := mcDir(name)
-			files, err := d.Minecraft.ListFiles(ctx, dirName, subPath)
+			files, err := d.Filesystem.ListFiles(ctx, dirName, subPath)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -947,7 +949,7 @@ func readServerFile(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)
-			content, err := d.Minecraft.ReadFile(ctx, dirName, filePath)
+			content, err := d.Filesystem.ReadFile(ctx, dirName, filePath)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -987,7 +989,7 @@ func writeServerFile(d *Deps) server.ServerTool {
 			gid := req.GetInt("gid", 1001)
 
 			dirName := mcDir(name)
-			if err := d.Minecraft.WriteFile(ctx, dirName, filePath, content, uid, gid); err != nil {
+			if err := d.Filesystem.WriteFile(ctx, dirName, filePath, content, uid, gid); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultText(fmt.Sprintf("File %q written to server %q", filePath, name)), nil
@@ -1021,7 +1023,7 @@ func moveServerFile(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)
-			if err := d.Minecraft.MoveFile(ctx, dirName, srcPath, dstPath, 1001, 1001); err != nil {
+			if err := d.Filesystem.MoveFile(ctx, dirName, srcPath, dstPath, 1001, 1001); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultText(fmt.Sprintf("Moved %q to %q on server %q", srcPath, dstPath, name)), nil
@@ -1050,7 +1052,7 @@ func deleteServerFile(d *Deps) server.ServerTool {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			dirName := mcDir(name)
-			if err := d.Minecraft.DeleteFile(ctx, dirName, filePath); err != nil {
+			if err := d.Filesystem.DeleteFile(ctx, dirName, filePath); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			return mcp.NewToolResultText(fmt.Sprintf("Deleted %q from server %q", filePath, name)), nil

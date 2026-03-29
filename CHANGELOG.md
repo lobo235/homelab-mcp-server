@@ -8,18 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `filesystem` client package for filesystem-gateway (file ops, backups, downloads)
 - `create_workload_secret` tool — create generic workload secrets with arbitrary key-value data (admin only)
 - `delete_workload_secret` tool — delete generic workload secrets (admin only)
 - Generic secret methods in vault client (`CreateGenericSecret`, `GetGenericSecret`, `DeleteGenericSecret`)
+- `FILESYSTEM_GATEWAY_URL` and `FILESYSTEM_GATEWAY_KEY` config vars
 - `VOLUME_ALLOWLIST` config — comma-separated additional allowed volume mount prefixes beyond `NFS_BASE_PATH`
 - `RequireAdmin` authz helper for admin-only tool enforcement
 - Prompt context mentions generic workload support and allowed volume prefixes
 
 ### Changed
+- All filesystem tools (init/delete dir, list/read/write/move/delete files, downloads, backups, archives) now route through filesystem-gateway instead of minecraft-gateway
+- `minecraft` client slimmed to RCON only (`ExecuteRCON`, `Ping`)
 - `ValidateJobSpec` now accepts multiple volume prefixes (`[]string`) instead of a single path
 - `provision_nomad_workload` now requires admin role
 - `destroy_nomad_workload` now requires admin role
 - `deploy_generic_workload` now requires admin role
+
+### Fixed
+- `WriteFile` MCP client now uses `POST` (was incorrectly using `PUT`) to match gateway route
+- `RenameServer` MCP client now calls `/migrate` (was incorrectly calling `/rename`) to match gateway route
 
 ## [v1.9.1] - 2026-03-26
 

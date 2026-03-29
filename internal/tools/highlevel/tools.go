@@ -9,6 +9,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
+	"github.com/lobo235/homelab-mcp-server/internal/clients/filesystem"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
 	"github.com/lobo235/homelab-mcp-server/internal/tools/authz"
@@ -20,9 +21,10 @@ func mcDir(jobID string) string { return validation.MCServerDir(jobID) }
 
 // Deps holds the dependencies for high-level tools.
 type Deps struct {
-	Nomad     *nomad.Client
-	Minecraft *minecraft.Client
-	Log       *slog.Logger
+	Nomad      *nomad.Client
+	Minecraft  *minecraft.Client
+	Filesystem *filesystem.Client
+	Log        *slog.Logger
 }
 
 // Register adds all Layer 3 high-level tools to the MCP server.
@@ -159,7 +161,7 @@ func upgradeMinecraftServer(d *Deps) server.ServerTool {
 			// Step 1: Create a backup before upgrade (uses bare dir name).
 			dirName := mcDir(name)
 			d.Log.Info("upgrade: creating backup", "server", name, "dir", dirName)
-			backup, backupErr := d.Minecraft.CreateBackup(ctx, dirName, 1001, 1001)
+			backup, backupErr := d.Filesystem.CreateBackup(ctx, dirName, 1001, 1001)
 
 			// Step 2: Fetch current job spec.
 			spec, specErr := d.Nomad.GetJobSpec(ctx, name)

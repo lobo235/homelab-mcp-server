@@ -13,6 +13,7 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/clients/adguard"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/cloudflare"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/curseforge"
+	"github.com/lobo235/homelab-mcp-server/internal/clients/filesystem"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/nomad"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/vault"
@@ -26,6 +27,7 @@ type Deps struct {
 	Adguard    *adguard.Client
 	Cloudflare *cloudflare.Client
 	Minecraft  *minecraft.Client
+	Filesystem *filesystem.Client
 	Curseforge *curseforge.Client
 	Vault      *vault.Client
 	Log        *slog.Logger
@@ -112,7 +114,7 @@ func (d *Deps) executeProvision(ctx context.Context, name, hcl string) (map[stri
 	// Step 3: Init NFS server directory — uses bare name without mc- prefix.
 	// Idempotent: if directory already exists from a previous attempt, continue.
 	d.Log.Info("provision: init directory", "server", name, "dir", dirName)
-	if err := d.Minecraft.InitServer(ctx, dirName, 1001, 1001); err != nil {
+	if err := d.Filesystem.InitServer(ctx, dirName, 1001, 1001); err != nil {
 		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "chown") {
 			d.Log.Info("provision: directory already exists or chown skipped, continuing", "dir", dirName)
 		} else {
@@ -261,7 +263,7 @@ func (d *Deps) executeDestroy(name string, deleteDir bool) {
 
 	if deleteDir {
 		d.Log.Info("destroy: delete directory", "server", name, "dir", dirName)
-		if err := d.Minecraft.DeleteServer(ctx, dirName); err != nil {
+		if err := d.Filesystem.DeleteServer(ctx, dirName); err != nil {
 			d.Log.Error("destroy: delete directory failed", "error", err)
 			tracker.addError(name, fmt.Sprintf("delete directory: %s", err.Error()))
 		} else {
@@ -311,7 +313,7 @@ func (d *Deps) rollbackRename(ctx context.Context, oldName, newName string, step
 			}
 		case "directory":
 			// Rename directory back from new to old.
-			if err := d.Minecraft.RenameServer(ctx, newDir, oldDir); err != nil {
+			if err := d.Filesystem.RenameServer(ctx, newDir, oldDir); err != nil {
 				d.Log.Error("rollback: rename directory back failed", "error", err)
 			}
 		case "stop_old":
@@ -340,7 +342,7 @@ func (d *Deps) executeRename(ctx context.Context, oldName, newName, oldHCL strin
 
 	// Step 2: Rename NFS directory (old bare name -> new bare name).
 	d.Log.Info("rename: rename directory", "old_dir", oldDir, "new_dir", newDir)
-	if err := d.Minecraft.RenameServer(ctx, oldDir, newDir); err != nil {
+	if err := d.Filesystem.RenameServer(ctx, oldDir, newDir); err != nil {
 		d.rollbackRename(ctx, oldName, newName, steps)
 		return nil, fmt.Errorf("step 2/7 rename directory failed: %w", err)
 	}

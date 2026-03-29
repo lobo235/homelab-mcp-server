@@ -19,6 +19,8 @@ type Config struct {
 	CFGatewayKey         string
 	MinecraftGatewayURL  string
 	MinecraftGatewayKey  string
+	FilesystemGatewayURL string
+	FilesystemGatewayKey string
 	CurseforgeGatewayURL string
 	CurseforgeGatewayKey string
 	VaultGatewayURL      string
@@ -76,6 +78,8 @@ func Load() (*Config, error) {
 		CFGatewayKey:         os.Getenv("CF_GATEWAY_KEY"),
 		MinecraftGatewayURL:  os.Getenv("MINECRAFT_GATEWAY_URL"),
 		MinecraftGatewayKey:  os.Getenv("MINECRAFT_GATEWAY_KEY"),
+		FilesystemGatewayURL: os.Getenv("FILESYSTEM_GATEWAY_URL"),
+		FilesystemGatewayKey: os.Getenv("FILESYSTEM_GATEWAY_KEY"),
 		CurseforgeGatewayURL: os.Getenv("CURSEFORGE_GATEWAY_URL"),
 		CurseforgeGatewayKey: os.Getenv("CURSEFORGE_GATEWAY_KEY"),
 		VaultGatewayURL:      os.Getenv("VAULT_GATEWAY_URL"),
@@ -136,6 +140,8 @@ func Load() (*Config, error) {
 		"CF_GATEWAY_KEY":           cfg.CFGatewayKey,
 		"MINECRAFT_GATEWAY_URL":    cfg.MinecraftGatewayURL,
 		"MINECRAFT_GATEWAY_KEY":    cfg.MinecraftGatewayKey,
+		"FILESYSTEM_GATEWAY_URL":   cfg.FilesystemGatewayURL,
+		"FILESYSTEM_GATEWAY_KEY":   cfg.FilesystemGatewayKey,
 		"CURSEFORGE_GATEWAY_URL":   cfg.CurseforgeGatewayURL,
 		"CURSEFORGE_GATEWAY_KEY":   cfg.CurseforgeGatewayKey,
 		"VAULT_GATEWAY_URL":        cfg.VaultGatewayURL,

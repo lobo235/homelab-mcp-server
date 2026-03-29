@@ -10,7 +10,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	cfclient "github.com/lobo235/homelab-mcp-server/internal/clients/curseforge"
-	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
+	"github.com/lobo235/homelab-mcp-server/internal/clients/filesystem"
 	"github.com/lobo235/homelab-mcp-server/internal/tools/authz"
 	"github.com/lobo235/homelab-mcp-server/internal/validation"
 )
@@ -174,7 +174,7 @@ func (d *Deps) executeAddMod(ctx context.Context, p *addModParams) (map[string]a
 		return nil, fmt.Errorf("mod %q (project %s) file has no download URL — this mod may require manual download from CurseForge", mod.Name, p.modProjectID)
 	}
 	d.Log.Info("add_mod: downloading mod", "mod", mod.Name, "file", modFile.FileName)
-	mainDL, dlErr := d.Minecraft.DownloadToServer(ctx, p.dirName, minecraft.DownloadRequest{
+	mainDL, dlErr := d.Filesystem.DownloadToServer(ctx, p.dirName, filesystem.DownloadRequest{
 		URL: modFile.DownloadURL, DestPath: "mods", Mode: "overwrite", UID: 1001, GID: 1001,
 	})
 	if dlErr != nil {
@@ -283,7 +283,7 @@ func (d *Deps) resolveOneDep(ctx context.Context, modID int, p *addModParams) (*
 	}
 
 	d.Log.Info("add_mod: downloading dependency", "dep", depMod.Name, "file", depFile.FileName)
-	dlResult, dlErr := d.Minecraft.DownloadToServer(ctx, p.dirName, minecraft.DownloadRequest{
+	dlResult, dlErr := d.Filesystem.DownloadToServer(ctx, p.dirName, filesystem.DownloadRequest{
 		URL: depFile.DownloadURL, DestPath: "mods", Mode: "overwrite", UID: 1001, GID: 1001,
 	})
 	if dlErr != nil {
@@ -304,7 +304,7 @@ var preferredModloaders = []string{"NeoForge", "Fabric", "Forge", "Quilt"}
 
 // isModsFolderEmpty checks if the server's mods/ directory has any files.
 func (d *Deps) isModsFolderEmpty(ctx context.Context, dirName string) bool {
-	files, err := d.Minecraft.ListFiles(ctx, dirName, "mods")
+	files, err := d.Filesystem.ListFiles(ctx, dirName, "mods")
 	if err != nil {
 		return true // Assume empty if we can't check (dir may not exist yet).
 	}

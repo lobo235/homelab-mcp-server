@@ -14,6 +14,7 @@ import (
 	"github.com/lobo235/homelab-mcp-server/internal/clients/adguard"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/cloudflare"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/curseforge"
+	"github.com/lobo235/homelab-mcp-server/internal/clients/filesystem"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/ftb"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/minecraft"
 	"github.com/lobo235/homelab-mcp-server/internal/clients/modrinth"
@@ -60,6 +61,8 @@ func main() {
 		clients.NewBaseWithResilience(cfg.CFGatewayURL, cfg.CFGatewayKey, resilience.DefaultCircuitBreaker()))
 	mcClient := minecraft.NewClientWithBase(
 		clients.NewBaseWithResilience(cfg.MinecraftGatewayURL, cfg.MinecraftGatewayKey, resilience.DefaultCircuitBreaker()))
+	fsClient := filesystem.NewClientWithBase(
+		clients.NewBaseWithResilience(cfg.FilesystemGatewayURL, cfg.FilesystemGatewayKey, resilience.DefaultCircuitBreaker()))
 	curseforgeClient := curseforge.NewClientWithBase(
 		clients.NewBaseWithResilience(cfg.CurseforgeGatewayURL, cfg.CurseforgeGatewayKey, resilience.DefaultCircuitBreaker()))
 	vaultClient := vault.NewClientWithBase(
@@ -70,6 +73,7 @@ func main() {
 	checkGatewayHealth(log, "adguard-home-gateway", adguardClient)
 	checkGatewayHealth(log, "cloudflare-gateway", cfClient)
 	checkGatewayHealth(log, "minecraft-gateway", mcClient)
+	checkGatewayHealth(log, "filesystem-gateway", fsClient)
 	checkGatewayHealth(log, "curseforge-gateway", curseforgeClient)
 	checkGatewayHealth(log, "vault-gateway", vaultClient)
 
@@ -149,6 +153,7 @@ func main() {
 		Adguard:           adguardClient,
 		Cloudflare:        cfClient,
 		Minecraft:         mcClient,
+		Filesystem:        fsClient,
 		Curseforge:        curseforgeClient,
 		Vault:             vaultClient,
 		ItzgDocs:          itzgCache,
@@ -169,6 +174,7 @@ func main() {
 		Adguard:           adguardClient,
 		Cloudflare:        cfClient,
 		Minecraft:         mcClient,
+		Filesystem:        fsClient,
 		Curseforge:        curseforgeClient,
 		Vault:             vaultClient,
 		Log:               log,
@@ -182,9 +188,10 @@ func main() {
 
 	// Register Layer 3 — High-level task tools.
 	highlevel.Register(s, &highlevel.Deps{
-		Nomad:     nomadClient,
-		Minecraft: mcClient,
-		Log:       log,
+		Nomad:      nomadClient,
+		Minecraft:  mcClient,
+		Filesystem: fsClient,
+		Log:        log,
 	})
 
 	// Register MCP prompts.

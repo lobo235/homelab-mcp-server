@@ -70,7 +70,8 @@ homelab-mcp-server/
     │   ├── nomad/             # nomad-gateway HTTP client
     │   ├── adguard/           # adguard-home-gateway HTTP client
     │   ├── cloudflare/        # cloudflare-gateway HTTP client
-    │   ├── minecraft/         # minecraft-gateway HTTP client
+    │   ├── filesystem/        # filesystem-gateway HTTP client
+    │   ├── minecraft/         # minecraft-gateway RCON HTTP client
     │   ├── curseforge/        # curseforge-gateway HTTP client
     │   ├── modrinth/          # Modrinth public API client
     │   ├── ftb/               # FTB public API client (api.modpacks.ch)
@@ -100,8 +101,10 @@ All config via ENV vars. Loaded from `.env` in development (via `godotenv`; miss
 | `ADGUARD_GATEWAY_KEY` | yes | — | API key for adguard-home-gateway |
 | `CF_GATEWAY_URL` | yes | — | Base URL of cloudflare-gateway |
 | `CF_GATEWAY_KEY` | yes | — | API key for cloudflare-gateway |
-| `MINECRAFT_GATEWAY_URL` | yes | — | Base URL of minecraft-gateway |
+| `MINECRAFT_GATEWAY_URL` | yes | — | Base URL of minecraft-gateway (RCON only) |
 | `MINECRAFT_GATEWAY_KEY` | yes | — | API key for minecraft-gateway |
+| `FILESYSTEM_GATEWAY_URL` | yes | — | Base URL of filesystem-gateway |
+| `FILESYSTEM_GATEWAY_KEY` | yes | — | API key for filesystem-gateway |
 | `CURSEFORGE_GATEWAY_URL` | yes | — | Base URL of curseforge-gateway |
 | `CURSEFORGE_GATEWAY_KEY` | yes | — | API key for curseforge-gateway |
 | `VAULT_GATEWAY_URL` | yes | — | Base URL of vault-gateway |
@@ -128,7 +131,8 @@ internal/config/config.go         — ENV-based config with validation
 internal/clients/nomad/           — nomad-gateway HTTP client wrapper
 internal/clients/adguard/         — adguard-home-gateway HTTP client wrapper
 internal/clients/cloudflare/      — cloudflare-gateway HTTP client wrapper
-internal/clients/minecraft/       — minecraft-gateway HTTP client wrapper
+internal/clients/filesystem/      — filesystem-gateway HTTP client (file ops, backups, downloads)
+internal/clients/minecraft/       — minecraft-gateway HTTP client (RCON only)
 internal/clients/curseforge/      — curseforge-gateway HTTP client wrapper
 internal/clients/vault/           — vault-gateway HTTP client wrapper
 internal/tools/atomic/            — Layer 1 MCP tools (single gateway call each)
